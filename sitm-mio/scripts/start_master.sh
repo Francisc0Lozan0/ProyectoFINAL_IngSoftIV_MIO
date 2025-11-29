@@ -1,9 +1,7 @@
 #!/bin/bash
 
+DATA_PATH="./data"
+
 echo "Iniciando Master Server SITM-MIO"
 
-# Configuración
-DATA_PATH="/ruta/a/tus/archivos/csv"
-MASTER_ENDPOINT="tcp -p 10000"
-
-java -cp target/classes com.sitm.mio.master.DistributedMasterServer "$DATA_PATH"
+java -jar target/mio-1.0-SNAPSHOT-jar-with-dependencies.jar "$DATA_PATH"

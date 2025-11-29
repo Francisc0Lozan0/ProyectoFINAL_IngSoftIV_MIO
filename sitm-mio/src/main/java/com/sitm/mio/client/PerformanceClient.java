@@ -1,5 +1,6 @@
 package com.sitm.mio.client;
 
+import com.sitm.mio.graphs.GraphVisualizer;
 import com.sitm.mio.util.CSVDataLoader;
 import com.sitm.mio.util.ConfigManager;
 
@@ -61,12 +62,52 @@ public class PerformanceClient {
                 
                 printResults(results, datagrams.length, processTime);
                 
+                showGraphVisualization(dataPath, results);
+                
                 Thread.sleep(2000);
             }
             
         } catch (java.lang.Exception e) {
             System.err.println("Error during testing: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    
+    private void showGraphVisualization(String dataPath, VelocityResult[] results) {
+        try {
+            System.out.println("\n Generando visualización del grafo...");
+            
+            // Crear y mostrar el visualizador
+            GraphVisualizer visualizer = new GraphVisualizer();
+            visualizer.loadData(dataPath);
+            
+            // Crear ventana
+            javax.swing.JFrame frame = new javax.swing.JFrame("SITM-MIO - Grafo de Velocidades");
+            frame.setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
+            frame.add(visualizer);
+            frame.pack();
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+            
+            // Exportar a JPG
+            String timestamp = String.valueOf(System.currentTimeMillis());
+            String outputFile = "grafo_velocidades_" + timestamp + ".jpg";
+            visualizer.exportToJPG(outputFile);
+            
+            System.out.println(" Visualización guardada en: " + outputFile);
+            System.out.println(" Resumen de velocidades calculadas:");
+            
+            // Mostrar resumen de velocidades por arco
+            for (VelocityResult result : results) {
+                if (result.sampleCount > 0) {
+                    System.out.printf("   %s: %.2f m/s (%.1f km/h) - %d muestras%n",
+                            result.arcId, result.averageVelocity, 
+                            result.averageVelocity * 3.6, result.sampleCount);
+                }
+            }
+            
+        } catch (java.lang.Exception e) {
+            System.err.println("  Error en visualización: " + e.getMessage());
         }
     }
     
