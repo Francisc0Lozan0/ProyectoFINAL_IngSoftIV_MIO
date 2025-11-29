@@ -1,6 +1,6 @@
 package com.sitm.mio.master;
 
-import com.zeroc.Ice.*;
+import Ice.*;
 import com.sitm.mio.util.ConfigManager;
 
 public class MasterServer {
@@ -28,7 +28,7 @@ public class MasterServer {
             
             communicator.waitForShutdown();
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Error starting Master Server: " + e.getMessage());
             e.printStackTrace();
         } finally {

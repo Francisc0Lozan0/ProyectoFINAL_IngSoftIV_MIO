@@ -1,7 +1,7 @@
 package com.sitm.mio.worker;
 
 import SITM.MIO.*;
-import com.zeroc.Ice.Current;
+import Ice.Current;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -26,14 +26,43 @@ public class VelocityWorker implements Worker {
         try {
             Map<String, List<BusDatagram>> tripDatagrams = groupDatagramsByTrip(task.datagrams);
             Map<String, List<Double>> arcVelocities = calculateArcVelocities(tripDatagrams, task.arcs);
+
+            try {
+                com.sitm.mio.persistence.VelocityDao dao = new com.sitm.mio.persistence.VelocityDao();
+                String ym = com.sitm.mio.persistence.VelocityDao.currentYearMonth();
+                for (Map.Entry<String, List<Double>> e : arcVelocities.entrySet()) {
+                    String arcId = e.getKey();
+                    List<Double> vals = e.getValue();
+                    long samples = vals.size();
+                    double avg = 0.0;
+                    if (samples > 0) {
+                        double sum = 0.0;
+                        for (Double v : vals) sum += v;
+                        avg = sum / samples;
+                    }
+                    
+                    String lineId = "unknown";
+                    try {
+                        if (arcId != null && arcId.contains("_")) {
+                            String[] parts = arcId.split("_");
+                            if (parts.length >= 2) lineId = parts[1];
+                        }
+                    } catch (Exception ex) {}
+
+                    dao.upsert(ym, lineId, arcId, avg, samples);
+                }
+            } catch (Exception ex) {
+                System.err.println("Worker DB persist error: " + ex.getMessage());
+            }
+
+            // Return aggregated summary as before
             VelocityResult aggregatedResult = calculateAverages(arcVelocities);
-            
             aggregatedResult.arcId = "aggregated-" + task.taskId;
             aggregatedResult.processingTime = System.currentTimeMillis() - startTime;
-            
+
             System.out.println("Worker " + workerId + " completed: " + arcVelocities.size() + 
                              " arcs, " + aggregatedResult.sampleCount + " samples");
-            
+
             return aggregatedResult;
             
         } catch (Exception e) {

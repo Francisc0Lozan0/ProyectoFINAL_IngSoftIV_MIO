@@ -1,7 +1,7 @@
 package com.sitm.mio.worker;
 
 import SITM.MIO.*;
-import com.zeroc.Ice.*;
+import Ice.*;
 import com.sitm.mio.util.ConfigManager;
 
 public class WorkerServer {
@@ -27,10 +27,13 @@ public class WorkerServer {
             
             System.out.println("Worker " + workerId + " started successfully");
             System.out.println("Registered with master: " + masterEndpoint);
+
+                // Initialize DB pool (best-effort)
+                    try { DBConnection.getConnection().close(); } catch (java.lang.Exception e) {}
             
             communicator.waitForShutdown();
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Error starting Worker " + workerId + ": " + e.getMessage());
             e.printStackTrace();
         } finally {

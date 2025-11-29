@@ -2,7 +2,7 @@ package com.sitm.mio.client;
 
 import SITM.MIO.*;
 import com.sitm.mio.util.CSVDataLoader;
-import com.zeroc.Ice.*;
+import Ice.*;
 import java.io.*;
 import java.util.*;
 

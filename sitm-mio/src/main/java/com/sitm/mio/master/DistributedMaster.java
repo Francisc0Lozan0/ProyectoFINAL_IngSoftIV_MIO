@@ -4,12 +4,14 @@ import SITM.MIO.*;
 import com.sitm.mio.util.CSVDataLoader;
 import com.sitm.mio.util.ConfigManager;
 import com.sitm.mio.util.MetricsCollector;
-import com.zeroc.Ice.Current;
+import com.sitm.mio.persistence.VelocityDao;
+import com.sitm.mio.persistence.DBConnection;
+import Ice.Current;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DistributedMaster implements Master {
+public class DistributedMaster extends _MasterDisp {
     private final List<WorkerPrx> workers = new CopyOnWriteArrayList<>();
     private final int maxWorkers;
     private final AtomicInteger taskCounter = new AtomicInteger(0);
@@ -31,6 +33,13 @@ public class DistributedMaster implements Master {
         this.taskExecutor = Executors.newCachedThreadPool();
         loadStaticData(dataPath);
         startHealthChecks();
+        // Initialize persistence helper
+        try {
+            // force DB pool init
+            DBConnection.getConnection().close();
+        } catch (Exception e) {
+            System.err.println("Warning: DB connection not available: " + e.getMessage());
+        }
         System.out.println("Distributed Master initialized - Max workers: " + maxWorkers);
     }
 
@@ -122,6 +131,8 @@ public class DistributedMaster implements Master {
             long endTime = System.currentTimeMillis();
             metricsCollector.recordProcessing(datagrams.length, endTime - startTime);
             
+            // Workers persist per-arc results themselves; master will not double-persist here.
+
             System.out.println("Distributed processing completed in " + (endTime - startTime) + "ms");
             return results;
 
