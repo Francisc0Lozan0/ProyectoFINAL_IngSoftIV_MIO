@@ -55,9 +55,9 @@ public class WorkerServer {
                 throw new Error("Invalid master proxy");
             }
             
-            // Pass the servant instance (the adapter has activated the servant and created a proxy),
-            // the generated API expects a Worker (interface) and the servant implements Worker.
-            master.registerWorker(worker);
+            // Pass the worker proxy to the master. The generated API expects a WorkerPrx.
+            SITM.MIO.WorkerPrx workerProxy = SITM.MIO.WorkerPrxHelper.uncheckedCast(workerPrx);
+            master.registerWorker(workerProxy);
             
         } catch (java.lang.Exception e) {
             System.err.println("Failed to register with master: " + e.getMessage());

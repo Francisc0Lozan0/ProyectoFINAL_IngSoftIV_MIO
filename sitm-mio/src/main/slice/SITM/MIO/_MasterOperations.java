@@ -22,9 +22,9 @@ package SITM.MIO;
 
 public interface _MasterOperations
 {
-    void registerWorker(Worker worker, Ice.Current __current);
+    void registerWorker(WorkerPrx worker, Ice.Current __current);
 
-    void unregisterWorker(Worker worker, Ice.Current __current);
+    void unregisterWorker(WorkerPrx worker, Ice.Current __current);
 
     VelocityResult[] processHistoricalData(BusDatagram[] data, Arc[] arcs, Stop[] stops, Ice.Current __current);
 

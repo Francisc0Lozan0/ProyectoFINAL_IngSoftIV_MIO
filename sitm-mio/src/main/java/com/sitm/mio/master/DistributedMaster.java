@@ -2,7 +2,6 @@ package com.sitm.mio.master;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +28,12 @@ import SITM.MIO.ProcessingTask;
 import SITM.MIO.Stop;
 import SITM.MIO.StreamingWindow;
 import SITM.MIO.VelocityResult;
-import SITM.MIO.Worker;
+import SITM.MIO.WorkerPrx;
 import SITM.MIO._MasterDisp;
 
 public class DistributedMaster extends _MasterDisp {
-    private final List<Worker> workers = new CopyOnWriteArrayList<>();
-    private final Map<Worker, String> workerIds = new ConcurrentHashMap<>();
+    private final List<WorkerPrx> workers = new CopyOnWriteArrayList<>();
+    private final Map<WorkerPrx, String> workerIds = new ConcurrentHashMap<>();
     private final int maxWorkers;
     private final AtomicInteger taskCounter = new AtomicInteger(0);
     private Stop[] stops;
@@ -78,7 +77,7 @@ public class DistributedMaster extends _MasterDisp {
     }
 
     @Override
-    public synchronized void registerWorker(Worker worker, Current current) {
+    public synchronized void registerWorker(WorkerPrx worker, Current current) {
         String workerId = current.id.name;
 
         if (workers.size() >= maxWorkers) {
@@ -95,7 +94,7 @@ public class DistributedMaster extends _MasterDisp {
     }
 
     @Override
-    public synchronized void unregisterWorker(Worker worker, Current current) {
+    public synchronized void unregisterWorker(WorkerPrx worker, Current current) {
         String workerId = current.id.name;
         workers.remove(worker);
         workerIds.remove(worker);
@@ -115,13 +114,12 @@ public class DistributedMaster extends _MasterDisp {
 
         try {
             List<ProcessingTask> tasks = partitionData(datagrams, workers.size());
-            List<VelocityResult> allResults = Collections.synchronizedList(new ArrayList<>());
             List<CompletableFuture<VelocityResult>> futures = new ArrayList<>();
 
             System.out.println("Distributing " + tasks.size() + " tasks to " + workers.size() + " workers");
 
             for (ProcessingTask task : tasks) {
-                        Worker worker = loadBalancer.selectWorker(workers);
+                        WorkerPrx worker = loadBalancer.selectWorker(workers);
                 if (worker != null) {
                     CompletableFuture<VelocityResult> future = CompletableFuture.supplyAsync(() -> {
                         try {
@@ -177,7 +175,7 @@ public class DistributedMaster extends _MasterDisp {
             throw new RuntimeException("No workers available for processing");
         }
 
-        Worker worker = workers.get(0);
+        WorkerPrx worker = workers.get(0);
         try {
             VelocityResult result = worker.processStreamingWindow(window);
             return new VelocityResult[]{result};
@@ -228,9 +226,9 @@ public class DistributedMaster extends _MasterDisp {
 
     private void startHealthChecks() {
         healthCheckExecutor.scheduleAtFixedRate(() -> {
-            Iterator<Worker> iterator = workers.iterator();
+            Iterator<WorkerPrx> iterator = workers.iterator();
             while (iterator.hasNext()) {
-                Worker worker = iterator.next();
+                WorkerPrx worker = iterator.next();
                 try {
                     if (!worker.isAlive()) {
                         String wid = workerIds.getOrDefault(worker, "unknown");

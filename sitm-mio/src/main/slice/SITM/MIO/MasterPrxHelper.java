@@ -552,59 +552,59 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
 
     private static final String __registerWorker_name = "registerWorker";
 
-    public void registerWorker(Worker worker)
+    public void registerWorker(WorkerPrx worker)
     {
         registerWorker(worker, null, false);
     }
 
-    public void registerWorker(Worker worker, java.util.Map<String, String> __ctx)
+    public void registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx)
     {
         registerWorker(worker, __ctx, true);
     }
 
-    private void registerWorker(Worker worker, java.util.Map<String, String> __ctx, boolean __explicitCtx)
+    private void registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, boolean __explicitCtx)
     {
         end_registerWorker(begin_registerWorker(worker, __ctx, __explicitCtx, true, null));
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker)
     {
         return begin_registerWorker(worker, null, false, false, null);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx)
     {
         return begin_registerWorker(worker, __ctx, true, false, null);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, Ice.Callback __cb)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, Ice.Callback __cb)
     {
         return begin_registerWorker(worker, null, false, false, __cb);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx, Ice.Callback __cb)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Ice.Callback __cb)
     {
         return begin_registerWorker(worker, __ctx, true, false, __cb);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, Callback_Master_registerWorker __cb)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, Callback_Master_registerWorker __cb)
     {
         return begin_registerWorker(worker, null, false, false, __cb);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx, Callback_Master_registerWorker __cb)
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Callback_Master_registerWorker __cb)
     {
         return begin_registerWorker(worker, __ctx, true, false, __cb);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb)
     {
         return begin_registerWorker(worker, null, false, false, __responseCb, __exceptionCb, null);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
                                                 IceInternal.Functional_BoolCallback __sentCb)
@@ -612,7 +612,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_registerWorker(worker, null, false, false, __responseCb, __exceptionCb, __sentCb);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 java.util.Map<String, String> __ctx, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb)
@@ -620,7 +620,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_registerWorker(worker, __ctx, true, false, __responseCb, __exceptionCb, null);
     }
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 java.util.Map<String, String> __ctx, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
@@ -629,7 +629,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_registerWorker(worker, __ctx, true, false, __responseCb, __exceptionCb, __sentCb);
     }
 
-    private Ice.AsyncResult begin_registerWorker(Worker worker, 
+    private Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                  java.util.Map<String, String> __ctx, 
                                                  boolean __explicitCtx, 
                                                  boolean __synchronous, 
@@ -644,7 +644,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
                                     new IceInternal.Functional_OnewayCallback(__responseCb, __exceptionCb, __sentCb));
     }
 
-    private Ice.AsyncResult begin_registerWorker(Worker worker, 
+    private Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                  java.util.Map<String, String> __ctx, 
                                                  boolean __explicitCtx, 
                                                  boolean __synchronous, 
@@ -655,8 +655,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         {
             __result.prepare(__registerWorker_name, Ice.OperationMode.Normal, __ctx, __explicitCtx, __synchronous);
             IceInternal.BasicStream __os = __result.startWriteParams(Ice.FormatType.DefaultFormat);
-            __os.writeObject(worker);
-            __os.writePendingObjects();
+            SITM.MIO.WorkerPrxHelper.__write(__os, worker);
             __result.endWriteParams();
             __result.invoke();
         }
@@ -674,59 +673,59 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
 
     private static final String __unregisterWorker_name = "unregisterWorker";
 
-    public void unregisterWorker(Worker worker)
+    public void unregisterWorker(WorkerPrx worker)
     {
         unregisterWorker(worker, null, false);
     }
 
-    public void unregisterWorker(Worker worker, java.util.Map<String, String> __ctx)
+    public void unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx)
     {
         unregisterWorker(worker, __ctx, true);
     }
 
-    private void unregisterWorker(Worker worker, java.util.Map<String, String> __ctx, boolean __explicitCtx)
+    private void unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, boolean __explicitCtx)
     {
         end_unregisterWorker(begin_unregisterWorker(worker, __ctx, __explicitCtx, true, null));
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker)
     {
         return begin_unregisterWorker(worker, null, false, false, null);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx)
     {
         return begin_unregisterWorker(worker, __ctx, true, false, null);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, Ice.Callback __cb)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, Ice.Callback __cb)
     {
         return begin_unregisterWorker(worker, null, false, false, __cb);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx, Ice.Callback __cb)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Ice.Callback __cb)
     {
         return begin_unregisterWorker(worker, __ctx, true, false, __cb);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, Callback_Master_unregisterWorker __cb)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, Callback_Master_unregisterWorker __cb)
     {
         return begin_unregisterWorker(worker, null, false, false, __cb);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx, Callback_Master_unregisterWorker __cb)
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Callback_Master_unregisterWorker __cb)
     {
         return begin_unregisterWorker(worker, __ctx, true, false, __cb);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb)
     {
         return begin_unregisterWorker(worker, null, false, false, __responseCb, __exceptionCb, null);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
                                                   IceInternal.Functional_BoolCallback __sentCb)
@@ -734,7 +733,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_unregisterWorker(worker, null, false, false, __responseCb, __exceptionCb, __sentCb);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   java.util.Map<String, String> __ctx, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb)
@@ -742,7 +741,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_unregisterWorker(worker, __ctx, true, false, __responseCb, __exceptionCb, null);
     }
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   java.util.Map<String, String> __ctx, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
@@ -751,7 +750,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         return begin_unregisterWorker(worker, __ctx, true, false, __responseCb, __exceptionCb, __sentCb);
     }
 
-    private Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    private Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                    java.util.Map<String, String> __ctx, 
                                                    boolean __explicitCtx, 
                                                    boolean __synchronous, 
@@ -766,7 +765,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
                                       new IceInternal.Functional_OnewayCallback(__responseCb, __exceptionCb, __sentCb));
     }
 
-    private Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    private Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                    java.util.Map<String, String> __ctx, 
                                                    boolean __explicitCtx, 
                                                    boolean __synchronous, 
@@ -777,8 +776,7 @@ public final class MasterPrxHelper extends Ice.ObjectPrxHelperBase implements Ma
         {
             __result.prepare(__unregisterWorker_name, Ice.OperationMode.Normal, __ctx, __explicitCtx, __synchronous);
             IceInternal.BasicStream __os = __result.startWriteParams(Ice.FormatType.DefaultFormat);
-            __os.writeObject(worker);
-            __os.writePendingObjects();
+            SITM.MIO.WorkerPrxHelper.__write(__os, worker);
             __result.endWriteParams();
             __result.invoke();
         }

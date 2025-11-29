@@ -46,28 +46,28 @@ public class CSVDataLoader {
         return datagrams.toArray(new BusDatagram[0]);
     }
 
-    private static BusDatagram parseDatagram(String line) {
-        try {
-            String[] parts = line.split(",");
-            if (parts.length < 12) return null;
-            
-            BusDatagram dgram = new BusDatagram();
-            dgram.eventType = Integer.parseInt(parts[0].trim());
-            dgram.stopId = parts[2].trim();
-            dgram.odometer = Double.parseDouble(parts[3].trim());
-            dgram.latitude = parseCoordinate(parts[4].trim());
-            dgram.longitude = parseCoordinate(parts[5].trim());
-            dgram.lineId = parts[7].trim();
-            dgram.tripId = parts[9].trim();
-            dgram.datagramDate = parts[10].trim();
-            dgram.busId = parts[11].trim();
-            
-            return dgram;
-        } catch (Exception e) {
-            System.err.println("Error parsing datagram: " + line);
-            return null;
-        }
+private static BusDatagram parseDatagram(String line) {
+    try {
+        String[] parts = line.split(",");
+        if (parts.length < 11) return null;
+        
+        BusDatagram dgram = new BusDatagram();
+        dgram.eventType = Integer.parseInt(parts[0].trim());
+        dgram.stopId = parts[2].trim();
+        dgram.odometer = Double.parseDouble(parts[3].trim());
+        dgram.latitude = parseCoordinate(parts[4].trim());
+        dgram.longitude = parseCoordinate(parts[5].trim());
+        dgram.lineId = parts[6].trim();   
+        dgram.tripId = parts[7].trim();    
+        dgram.datagramDate = parts[9].trim(); 
+        dgram.busId = parts[10].trim();    
+        
+        return dgram;
+    } catch (Exception e) {
+        System.err.println("Error parsing datagram: " + line);
+        return null;
     }
+}
 
     private static double parseCoordinate(String coord) {
         try {

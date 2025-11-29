@@ -22,37 +22,37 @@ package SITM.MIO;
 
 public interface MasterPrx extends Ice.ObjectPrx
 {
-    public void registerWorker(Worker worker);
+    public void registerWorker(WorkerPrx worker);
 
-    public void registerWorker(Worker worker, java.util.Map<String, String> __ctx);
+    public void registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, Ice.Callback __cb);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, Ice.Callback __cb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx, Ice.Callback __cb);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Ice.Callback __cb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, Callback_Master_registerWorker __cb);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, Callback_Master_registerWorker __cb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, java.util.Map<String, String> __ctx, Callback_Master_registerWorker __cb);
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Callback_Master_registerWorker __cb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
                                                 IceInternal.Functional_BoolCallback __sentCb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 java.util.Map<String, String> __ctx, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb);
 
-    public Ice.AsyncResult begin_registerWorker(Worker worker, 
+    public Ice.AsyncResult begin_registerWorker(WorkerPrx worker, 
                                                 java.util.Map<String, String> __ctx, 
                                                 IceInternal.Functional_VoidCallback __responseCb, 
                                                 IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
@@ -60,37 +60,37 @@ public interface MasterPrx extends Ice.ObjectPrx
 
     public void end_registerWorker(Ice.AsyncResult __result);
 
-    public void unregisterWorker(Worker worker);
+    public void unregisterWorker(WorkerPrx worker);
 
-    public void unregisterWorker(Worker worker, java.util.Map<String, String> __ctx);
+    public void unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, Ice.Callback __cb);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, Ice.Callback __cb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx, Ice.Callback __cb);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Ice.Callback __cb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, Callback_Master_unregisterWorker __cb);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, Callback_Master_unregisterWorker __cb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, java.util.Map<String, String> __ctx, Callback_Master_unregisterWorker __cb);
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, java.util.Map<String, String> __ctx, Callback_Master_unregisterWorker __cb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 
                                                   IceInternal.Functional_BoolCallback __sentCb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   java.util.Map<String, String> __ctx, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb);
 
-    public Ice.AsyncResult begin_unregisterWorker(Worker worker, 
+    public Ice.AsyncResult begin_unregisterWorker(WorkerPrx worker, 
                                                   java.util.Map<String, String> __ctx, 
                                                   IceInternal.Functional_VoidCallback __responseCb, 
                                                   IceInternal.Functional_GenericCallback1<Ice.Exception> __exceptionCb, 

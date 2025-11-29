@@ -85,12 +85,12 @@ public abstract class _MasterDisp extends Ice.ObjectImpl implements Master
         return processStreamingData(window, null);
     }
 
-    public final void registerWorker(Worker worker)
+    public final void registerWorker(WorkerPrx worker)
     {
         registerWorker(worker, null);
     }
 
-    public final void unregisterWorker(Worker worker)
+    public final void unregisterWorker(WorkerPrx worker)
     {
         unregisterWorker(worker, null);
     }
@@ -99,11 +99,9 @@ public abstract class _MasterDisp extends Ice.ObjectImpl implements Master
     {
         __checkMode(Ice.OperationMode.Normal, __current.mode);
         IceInternal.BasicStream __is = __inS.startReadParams();
-        WorkerHolder worker = new WorkerHolder();
-        __is.readObject(worker);
-        __is.readPendingObjects();
+        SITM.MIO.WorkerPrx worker = SITM.MIO.WorkerPrxHelper.__read(__is);
         __inS.endReadParams();
-        __obj.registerWorker(worker.value, __current);
+        __obj.registerWorker(worker, __current);
         __inS.__writeEmptyParams();
         return Ice.DispatchStatus.DispatchOK;
     }
@@ -112,11 +110,9 @@ public abstract class _MasterDisp extends Ice.ObjectImpl implements Master
     {
         __checkMode(Ice.OperationMode.Normal, __current.mode);
         IceInternal.BasicStream __is = __inS.startReadParams();
-        WorkerHolder worker = new WorkerHolder();
-        __is.readObject(worker);
-        __is.readPendingObjects();
+        SITM.MIO.WorkerPrx worker = SITM.MIO.WorkerPrxHelper.__read(__is);
         __inS.endReadParams();
-        __obj.unregisterWorker(worker.value, __current);
+        __obj.unregisterWorker(worker, __current);
         __inS.__writeEmptyParams();
         return Ice.DispatchStatus.DispatchOK;
     }

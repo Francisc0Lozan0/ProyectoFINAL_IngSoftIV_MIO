@@ -3,7 +3,7 @@ package com.sitm.mio.master;
 import java.util.List;
 import java.util.Random;
 
-import SITM.MIO.Worker;
+import SITM.MIO.WorkerPrx;
 
 public class LoadBalancer {
     
@@ -21,7 +21,7 @@ public class LoadBalancer {
         this.strategy = strategy;
     }
     
-    public Worker selectWorker(List<Worker> workers) {
+    public WorkerPrx selectWorker(List<WorkerPrx> workers) {
         if (workers.isEmpty()) {
             return null;
         }
@@ -38,17 +38,17 @@ public class LoadBalancer {
         }
     }
 
-    private Worker roundRobin(List<Worker> workers) {
-        Worker selected = workers.get(currentIndex);
+    private WorkerPrx roundRobin(List<WorkerPrx> workers) {
+        WorkerPrx selected = workers.get(currentIndex);
         currentIndex = (currentIndex + 1) % workers.size();
         return selected;
     }
 
-    private Worker random(List<Worker> workers) {
+    private WorkerPrx random(List<WorkerPrx> workers) {
         return workers.get(random.nextInt(workers.size()));
     }
 
-    private Worker leastLoaded(List<Worker> workers) {
+    private WorkerPrx leastLoaded(List<WorkerPrx> workers) {
         return roundRobin(workers);
     }
 }

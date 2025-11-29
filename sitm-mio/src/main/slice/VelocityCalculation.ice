@@ -68,8 +68,8 @@ module MIO {
     };
 
     interface Master {
-        void registerWorker(Worker worker);
-        void unregisterWorker(Worker worker);
+        void registerWorker(WorkerPrx worker);
+        void unregisterWorker(WorkerPrx worker);
 
         VelocityResultSeq processHistoricalData(
             BusDatagramSeq data,
