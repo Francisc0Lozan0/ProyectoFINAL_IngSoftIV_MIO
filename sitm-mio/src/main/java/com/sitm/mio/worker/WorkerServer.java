@@ -1,8 +1,13 @@
 package com.sitm.mio.worker;
 
-import SITM.MIO.*;
-import Ice.*;
-import com.sitm.mio.util.ConfigManager;
+import com.sitm.mio.persistence.DBConnection;
+
+import Ice.Communicator;
+import Ice.ObjectAdapter;
+import Ice.ObjectPrx;
+import Ice.Util;
+import SITM.MIO.MasterPrx;
+import SITM.MIO.MasterPrxHelper;
 
 public class WorkerServer {
     private final String workerId;
@@ -23,7 +28,7 @@ public class WorkerServer {
             ObjectPrx workerPrx = adapter.add(worker, Util.stringToIdentity(workerId));
             adapter.activate();
             
-            registerWithMaster(workerPrx, masterEndpoint);
+            registerWithMaster(worker, workerPrx, masterEndpoint);
             
             System.out.println("Worker " + workerId + " started successfully");
             System.out.println("Registered with master: " + masterEndpoint);
@@ -41,19 +46,20 @@ public class WorkerServer {
         }
     }
 
-    private void registerWithMaster(ObjectPrx workerPrx, String masterEndpoint) {
+    private void registerWithMaster(VelocityWorker worker, ObjectPrx workerPrx, String masterEndpoint) {
         try {
             ObjectPrx base = communicator.stringToProxy("Master:" + masterEndpoint);
-            MasterPrx master = MasterPrx.checkedCast(base);
+            MasterPrx master = MasterPrxHelper.checkedCast(base);
             
             if (master == null) {
                 throw new Error("Invalid master proxy");
             }
             
-            WorkerPrx workerProxy = WorkerPrx.uncheckedCast(workerPrx);
-            master.registerWorker(workerProxy);
+            // Pass the servant instance (the adapter has activated the servant and created a proxy),
+            // the generated API expects a Worker (interface) and the servant implements Worker.
+            master.registerWorker(worker);
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Failed to register with master: " + e.getMessage());
             throw new RuntimeException("Registration failed", e);
         }

@@ -2,6 +2,7 @@ package com.sitm.mio.client;
 
 import SITM.MIO.*;
 import com.sitm.mio.util.CSVDataLoader;
+import com.sitm.mio.util.ConfigManager;
 import Ice.*;
 import java.io.*;
 import java.util.*;
@@ -19,7 +20,7 @@ public class StreamingClient {
         String masterEndpoint = "tcp -h " + masterHost + " -p " + masterPort;
         
         ObjectPrx base = communicator.stringToProxy("Master:" + masterEndpoint);
-        master = MasterPrx.checkedCast(base);
+        master = MasterPrxHelper.checkedCast(base);
         
         if (master == null) {
             throw new Error("Invalid master proxy");
@@ -58,7 +59,7 @@ public class StreamingClient {
                 Thread.sleep(5000);
             }
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Error during streaming simulation: " + e.getMessage());
             e.printStackTrace();
         }
@@ -86,7 +87,7 @@ public class StreamingClient {
         try {
             client.initialize(args);
             client.runStreamingSimulation(args[0], windowSize);
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Streaming client error: " + e.getMessage());
             e.printStackTrace();
         } finally {

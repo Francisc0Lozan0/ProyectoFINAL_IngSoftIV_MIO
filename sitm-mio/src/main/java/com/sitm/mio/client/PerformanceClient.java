@@ -1,10 +1,15 @@
 package com.sitm.mio.client;
 
-import SITM.MIO.*;
 import com.sitm.mio.util.CSVDataLoader;
-import Ice.*;
-import java.io.*;
-import java.util.*;
+import com.sitm.mio.util.ConfigManager;
+
+import Ice.Communicator;
+import Ice.ObjectPrx;
+import Ice.Util;
+import SITM.MIO.BusDatagram;
+import SITM.MIO.MasterPrx;
+import SITM.MIO.MasterPrxHelper;
+import SITM.MIO.VelocityResult;
 
 public class PerformanceClient {
     private Communicator communicator;
@@ -19,7 +24,7 @@ public class PerformanceClient {
         String masterEndpoint = "tcp -h " + masterHost + " -p " + masterPort;
         
         ObjectPrx base = communicator.stringToProxy("Master:" + masterEndpoint);
-        master = MasterPrx.checkedCast(base);
+        master = MasterPrxHelper.checkedCast(base);
         
         if (master == null) {
             throw new Error("Invalid master proxy");
@@ -59,7 +64,7 @@ public class PerformanceClient {
                 Thread.sleep(2000);
             }
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Error during testing: " + e.getMessage());
             e.printStackTrace();
         }
@@ -119,7 +124,7 @@ public class PerformanceClient {
             
             client.runTest(args[0], testSizes);
             
-        } catch (Exception e) {
+        } catch (java.lang.Exception e) {
             System.err.println("Client error: " + e.getMessage());
             e.printStackTrace();
         } finally {

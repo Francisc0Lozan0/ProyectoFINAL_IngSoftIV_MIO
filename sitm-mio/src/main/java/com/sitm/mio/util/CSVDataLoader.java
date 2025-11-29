@@ -1,9 +1,18 @@
 package com.sitm.mio.util;
 
-import SITM.MIO.*;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import SITM.MIO.Arc;
+import SITM.MIO.BusDatagram;
+import SITM.MIO.Stop;
 
 public class CSVDataLoader {
     
@@ -40,7 +49,7 @@ public class CSVDataLoader {
     private static BusDatagram parseDatagram(String line) {
         try {
             String[] parts = line.split(",");
-            if (parts.length < 11) return null;
+            if (parts.length < 12) return null;
             
             BusDatagram dgram = new BusDatagram();
             dgram.eventType = Integer.parseInt(parts[0].trim());
@@ -114,8 +123,8 @@ public class CSVDataLoader {
         }
     }
 
-    public static LineStop[] loadLineStops(String filePath) throws IOException {
-        List<LineStop> lineStops = new ArrayList<>();
+    public static SITM.MIO.LineStop[] loadLineStops(String filePath) throws IOException {
+        List<SITM.MIO.LineStop> lineStops = new ArrayList<>();
         
         try (BufferedReader br = Files.newBufferedReader(Paths.get(filePath))) {
             String line;
@@ -127,7 +136,7 @@ public class CSVDataLoader {
                     continue;
                 }
                 
-                LineStop lineStop = parseLineStop(line);
+                SITM.MIO.LineStop lineStop = parseLineStop(line);
                 if (lineStop != null) {
                     lineStops.add(lineStop);
                 }
@@ -135,17 +144,17 @@ public class CSVDataLoader {
         }
         
         System.out.println("Total line stops loaded: " + lineStops.size());
-        return lineStops.toArray(new LineStop[0]);
+        return lineStops.toArray(new SITM.MIO.LineStop[0]);
     }
 
-    private static LineStop parseLineStop(String line) {
+    private static SITM.MIO.LineStop parseLineStop(String line) {
         try {
             String cleaned = line.replaceAll("\"", "");
             String[] parts = cleaned.split(",");
             
             if (parts.length < 6) return null;
             
-            LineStop lineStop = new LineStop();
+            SITM.MIO.LineStop lineStop = new SITM.MIO.LineStop();
             lineStop.lineId = parts[3].trim();
             lineStop.stopId = parts[4].trim();
             lineStop.stopSequence = Integer.parseInt(parts[1].trim());
@@ -157,28 +166,28 @@ public class CSVDataLoader {
         }
     }
 
-    public static Arc[] buildArcs(LineStop[] lineStops, Stop[] stops) {
-        Map<String, List<LineStop>> stopsByLine = new HashMap<>();
+    public static Arc[] buildArcs(SITM.MIO.LineStop[] lineStops, Stop[] stops) {
+        Map<String, List<SITM.MIO.LineStop>> stopsByLine = new HashMap<>();
         List<Arc> arcs = new ArrayList<>();
         
-        for (LineStop ls : lineStops) {
+        for (SITM.MIO.LineStop ls : lineStops) {
             stopsByLine.computeIfAbsent(ls.lineId, k -> new ArrayList<>()).add(ls);
         }
         
-        for (Map.Entry<String, List<LineStop>> entry : stopsByLine.entrySet()) {
-            List<LineStop> lineStopList = entry.getValue();
+        for (Map.Entry<String, List<SITM.MIO.LineStop>> entry : stopsByLine.entrySet()) {
+            List<SITM.MIO.LineStop> lineStopList = entry.getValue();
             lineStopList.sort(Comparator.comparingInt(ls -> ls.stopSequence));
             
             for (int i = 0; i < lineStopList.size() - 1; i++) {
-                LineStop start = lineStopList.get(i);
-                LineStop end = lineStopList.get(i+1);
+                SITM.MIO.LineStop start = lineStopList.get(i);
+                SITM.MIO.LineStop end = lineStopList.get(i+1);
                 
                 Arc arc = new Arc();
                 arc.arcId = "ARC_" + entry.getKey() + "_" + start.stopSequence + "_" + end.stopSequence;
                 arc.lineId = entry.getKey();
                 arc.startStopId = start.stopId;
                 arc.endStopId = end.stopId;
-                arc.sequence = start.stopSequence;
+                arc.orderIndex = start.stopSequence;
                 
                 Stop startStop = findStop(stops, start.stopId);
                 Stop endStop = findStop(stops, end.stopId);

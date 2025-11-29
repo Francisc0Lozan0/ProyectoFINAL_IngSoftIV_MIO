@@ -1,18 +1,40 @@
 package com.sitm.mio.master;
 
-import SITM.MIO.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.sitm.mio.persistence.DBConnection;
 import com.sitm.mio.util.CSVDataLoader;
 import com.sitm.mio.util.ConfigManager;
 import com.sitm.mio.util.MetricsCollector;
-import com.sitm.mio.persistence.VelocityDao;
-import com.sitm.mio.persistence.DBConnection;
+
 import Ice.Current;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import SITM.MIO.Arc;
+import SITM.MIO.BusDatagram;
+import SITM.MIO.LineStop;
+import SITM.MIO.ProcessingTask;
+import SITM.MIO.Stop;
+import SITM.MIO.StreamingWindow;
+import SITM.MIO.VelocityResult;
+import SITM.MIO.Worker;
+import SITM.MIO._MasterDisp;
 
 public class DistributedMaster extends _MasterDisp {
-    private final List<WorkerPrx> workers = new CopyOnWriteArrayList<>();
+    private final List<Worker> workers = new CopyOnWriteArrayList<>();
+    private final Map<Worker, String> workerIds = new ConcurrentHashMap<>();
     private final int maxWorkers;
     private final AtomicInteger taskCounter = new AtomicInteger(0);
     private Stop[] stops;
@@ -56,7 +78,7 @@ public class DistributedMaster extends _MasterDisp {
     }
 
     @Override
-    public synchronized void registerWorker(WorkerPrx worker, Current current) {
+    public synchronized void registerWorker(Worker worker, Current current) {
         String workerId = current.id.name;
 
         if (workers.size() >= maxWorkers) {
@@ -66,15 +88,17 @@ public class DistributedMaster extends _MasterDisp {
 
         if (!workers.contains(worker)) {
             workers.add(worker);
+            workerIds.put(worker, workerId);
             metricsCollector.workerRegistered(workerId);
             System.out.println("Worker registered: " + workerId + " - Total: " + workers.size());
         }
     }
 
     @Override
-    public synchronized void unregisterWorker(WorkerPrx worker, Current current) {
+    public synchronized void unregisterWorker(Worker worker, Current current) {
         String workerId = current.id.name;
         workers.remove(worker);
+        workerIds.remove(worker);
         metricsCollector.workerUnregistered(workerId);
         System.out.println("Worker unregistered: " + workerId + " - Remaining: " + workers.size());
     }
@@ -97,12 +121,13 @@ public class DistributedMaster extends _MasterDisp {
             System.out.println("Distributing " + tasks.size() + " tasks to " + workers.size() + " workers");
 
             for (ProcessingTask task : tasks) {
-                WorkerPrx worker = loadBalancer.selectWorker(workers);
+                        Worker worker = loadBalancer.selectWorker(workers);
                 if (worker != null) {
                     CompletableFuture<VelocityResult> future = CompletableFuture.supplyAsync(() -> {
                         try {
                             VelocityResult result = worker.processTask(task);
-                            metricsCollector.taskCompleted(worker.ice_getIdentity().name);
+                                    String wid = workerIds.getOrDefault(worker, "unknown");
+                                    metricsCollector.taskCompleted(wid);
                             return result;
                         } catch (Exception e) {
                             System.err.println("Task " + task.taskId + " failed: " + e.getMessage());
@@ -152,7 +177,7 @@ public class DistributedMaster extends _MasterDisp {
             throw new RuntimeException("No workers available for processing");
         }
 
-        WorkerPrx worker = workers.get(0);
+        Worker worker = workers.get(0);
         try {
             VelocityResult result = worker.processStreamingWindow(window);
             return new VelocityResult[]{result};
@@ -203,17 +228,21 @@ public class DistributedMaster extends _MasterDisp {
 
     private void startHealthChecks() {
         healthCheckExecutor.scheduleAtFixedRate(() -> {
-            Iterator<WorkerPrx> iterator = workers.iterator();
+            Iterator<Worker> iterator = workers.iterator();
             while (iterator.hasNext()) {
-                WorkerPrx worker = iterator.next();
+                Worker worker = iterator.next();
                 try {
                     if (!worker.isAlive()) {
-                        System.out.println("Removing unresponsive worker: " + worker.ice_getIdentity().name);
+                        String wid = workerIds.getOrDefault(worker, "unknown");
+                        System.out.println("Removing unresponsive worker: " + wid);
                         iterator.remove();
+                        workerIds.remove(worker);
                     }
                 } catch (Exception e) {
-                    System.err.println("Health check failed for worker: " + worker.ice_getIdentity().name);
+                    String wid = workerIds.getOrDefault(worker, "unknown");
+                    System.err.println("Health check failed for worker: " + wid);
                     iterator.remove();
+                    workerIds.remove(worker);
                 }
             }
         }, 30, 30, TimeUnit.SECONDS);

@@ -1,12 +1,21 @@
 package com.sitm.mio.worker;
 
-import SITM.MIO.*;
-import Ice.Current;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-public class VelocityWorker implements Worker {
+import Ice.Current;
+import SITM.MIO.Arc;
+import SITM.MIO.BusDatagram;
+import SITM.MIO.ProcessingTask;
+import SITM.MIO.StreamingWindow;
+import SITM.MIO.VelocityResult;
+import SITM.MIO._WorkerDisp;
+
+public class VelocityWorker extends _WorkerDisp {
     private final String workerId;
     private static final DateTimeFormatter DATE_FORMATTER = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
