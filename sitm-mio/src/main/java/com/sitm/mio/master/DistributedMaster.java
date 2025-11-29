@@ -54,9 +54,7 @@ public class DistributedMaster extends _MasterDisp {
         this.taskExecutor = Executors.newCachedThreadPool();
         loadStaticData(dataPath);
         startHealthChecks();
-        // Initialize persistence helper
         try {
-            // force DB pool init
             DBConnection.getConnection().close();
         } catch (Exception e) {
             System.err.println("Warning: DB connection not available: " + e.getMessage());
@@ -119,13 +117,13 @@ public class DistributedMaster extends _MasterDisp {
             System.out.println("Distributing " + tasks.size() + " tasks to " + workers.size() + " workers");
 
             for (ProcessingTask task : tasks) {
-                        WorkerPrx worker = loadBalancer.selectWorker(workers);
+                WorkerPrx worker = loadBalancer.selectWorker(workers);
                 if (worker != null) {
                     CompletableFuture<VelocityResult> future = CompletableFuture.supplyAsync(() -> {
                         try {
                             VelocityResult result = worker.processTask(task);
-                                    String wid = workerIds.getOrDefault(worker, "unknown");
-                                    metricsCollector.taskCompleted(wid);
+                            String wid = workerIds.getOrDefault(worker, "unknown");
+                            metricsCollector.taskCompleted(wid);
                             return result;
                         } catch (Exception e) {
                             System.err.println("Task " + task.taskId + " failed: " + e.getMessage());
@@ -134,6 +132,8 @@ public class DistributedMaster extends _MasterDisp {
                             errorResult.averageVelocity = 0.0;
                             errorResult.sampleCount = 0;
                             errorResult.processingTime = 0;
+                            errorResult.periodStart = "";
+                            errorResult.periodEnd = "";
                             return errorResult;
                         }
                     }, taskExecutor);
@@ -145,18 +145,49 @@ public class DistributedMaster extends _MasterDisp {
                 futures.toArray(new CompletableFuture[0])
             );
             
-            VelocityResult[] results = allFutures.thenApply(v -> 
+            VelocityResult[] aggregatedResults = allFutures.thenApply(v -> 
                 futures.stream()
                     .map(CompletableFuture::join)
                     .toArray(VelocityResult[]::new)
             ).get(taskTimeout, TimeUnit.MILLISECONDS);
 
+            // CRÍTICO: Expandir resultados agregados en resultados individuales por arco
+            List<VelocityResult> expandedResults = new ArrayList<>();
+            
+            for (VelocityResult aggregated : aggregatedResults) {
+                if (aggregated.periodStart != null && !aggregated.periodStart.isEmpty()) {
+                    // Parsear el formato: "arcId1:velocity1:samples1|arcId2:velocity2:samples2|..."
+                    String[] arcData = aggregated.periodStart.split("\\|");
+                    
+                    for (String data : arcData) {
+                        String[] parts = data.split(":");
+                        if (parts.length == 3) {
+                            try {
+                                VelocityResult individual = new VelocityResult();
+                                individual.arcId = parts[0];
+                                individual.averageVelocity = Double.parseDouble(parts[1]);
+                                individual.sampleCount = Integer.parseInt(parts[2]);
+                                individual.processingTime = aggregated.processingTime;
+                                individual.periodStart = "";
+                                individual.periodEnd = "";
+                                
+                                expandedResults.add(individual);
+                            } catch (NumberFormatException e) {
+                                System.err.println("Error parsing arc data: " + data);
+                            }
+                        }
+                    }
+                }
+            }
+
+            VelocityResult[] results = expandedResults.toArray(new VelocityResult[0]);
+
             long endTime = System.currentTimeMillis();
             metricsCollector.recordProcessing(datagrams.length, endTime - startTime);
-            
-            // Workers persist per-arc results themselves; master will not double-persist here.
 
             System.out.println("Distributed processing completed in " + (endTime - startTime) + "ms");
+            System.out.println("Expanded to " + results.length + " individual arc results");
+            
             return results;
 
         } catch (TimeoutException e) {
@@ -164,6 +195,7 @@ public class DistributedMaster extends _MasterDisp {
             throw new RuntimeException("Processing timeout");
         } catch (Exception e) {
             System.err.println("Error in distributed processing: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Processing failed: " + e.getMessage());
         }
     }

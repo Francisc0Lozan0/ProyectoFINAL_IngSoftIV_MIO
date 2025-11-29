@@ -36,51 +36,84 @@ public class VelocityWorker extends _WorkerDisp {
             Map<String, List<BusDatagram>> tripDatagrams = groupDatagramsByTrip(task.datagrams);
             Map<String, List<Double>> arcVelocities = calculateArcVelocities(tripDatagrams, task.arcs);
 
+            // Persistir a DB si está disponible
             try {
-                com.sitm.mio.persistence.VelocityDao dao = new com.sitm.mio.persistence.VelocityDao();
-                String ym = com.sitm.mio.persistence.VelocityDao.currentYearMonth();
-                for (Map.Entry<String, List<Double>> e : arcVelocities.entrySet()) {
-                    String arcId = e.getKey();
-                    List<Double> vals = e.getValue();
-                    long samples = vals.size();
-                    double avg = 0.0;
-                    if (samples > 0) {
-                        double sum = 0.0;
-                        for (Double v : vals) sum += v;
-                        avg = sum / samples;
-                    }
+                if (com.sitm.mio.persistence.DBConnection.isAvailable()) {
+                    com.sitm.mio.persistence.VelocityDao dao = new com.sitm.mio.persistence.VelocityDao();
+                    String ym = com.sitm.mio.persistence.VelocityDao.currentYearMonth();
                     
-                    String lineId = "unknown";
-                    try {
-                        if (arcId != null && arcId.contains("_")) {
-                            String[] parts = arcId.split("_");
-                            if (parts.length >= 2) lineId = parts[1];
+                    for (Map.Entry<String, List<Double>> e : arcVelocities.entrySet()) {
+                        String arcId = e.getKey();
+                        List<Double> vals = e.getValue();
+                        long samples = vals.size();
+                        double avg = 0.0;
+                        if (samples > 0) {
+                            double sum = 0.0;
+                            for (Double v : vals) sum += v;
+                            avg = sum / samples;
                         }
-                    } catch (Exception ex) {}
-
-                    dao.upsert(ym, lineId, arcId, avg, samples);
+                        
+                        String lineId = extractLineIdFromArc(arcId);
+                        dao.upsert(ym, lineId, arcId, avg, samples);
+                    }
+                    System.out.println("Worker " + workerId + " - Results persisted to database");
+                } else {
+                    System.out.println("Worker " + workerId + " - DB not available, results computed in-memory only");
                 }
             } catch (Exception ex) {
-                System.err.println("Worker DB persist error: " + ex.getMessage());
+                System.err.println("Worker DB persist error (non-critical): " + ex.getMessage());
             }
 
-            // Return aggregated summary as before
-            VelocityResult aggregatedResult = calculateAverages(arcVelocities);
+            // Serializar los datos de velocidad en periodStart
+            // Formato: "arcId1:velocity1:samples1|arcId2:velocity2:samples2|..."
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, List<Double>> entry : arcVelocities.entrySet()) {
+                String arcId = entry.getKey();
+                List<Double> velocities = entry.getValue();
+                
+                if (velocities.size() > 0) {
+                    double sum = 0.0;
+                    for (Double v : velocities) sum += v;
+                    double avg = sum / velocities.size();
+                    
+                    if (sb.length() > 0) sb.append("|");
+                    sb.append(arcId).append(":").append(avg).append(":").append(velocities.size());
+                }
+            }
+            
+            VelocityResult aggregatedResult = new VelocityResult();
             aggregatedResult.arcId = "aggregated-" + task.taskId;
+            aggregatedResult.periodStart = sb.toString();
             aggregatedResult.processingTime = System.currentTimeMillis() - startTime;
+            aggregatedResult.sampleCount = arcVelocities.values().stream()
+                .mapToInt(List::size).sum();
+            
+            // Calcular velocidad promedio global
+            double totalVelocity = 0.0;
+            int totalSamples = 0;
+            for (List<Double> velocities : arcVelocities.values()) {
+                for (Double v : velocities) {
+                    totalVelocity += v;
+                    totalSamples++;
+                }
+            }
+            aggregatedResult.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
 
             System.out.println("Worker " + workerId + " completed: " + arcVelocities.size() + 
-                             " arcs, " + aggregatedResult.sampleCount + " samples");
+                             " arcs, " + totalSamples + " samples");
 
             return aggregatedResult;
             
         } catch (Exception e) {
             System.err.println("Error in worker " + workerId + ": " + e.getMessage());
+            e.printStackTrace();
             VelocityResult errorResult = new VelocityResult();
             errorResult.arcId = "error-" + task.taskId;
             errorResult.averageVelocity = 0.0;
             errorResult.sampleCount = 0;
             errorResult.processingTime = System.currentTimeMillis() - startTime;
+            errorResult.periodStart = "";
+            errorResult.periodEnd = "";
             return errorResult;
         }
     }
@@ -97,10 +130,24 @@ public class VelocityWorker extends _WorkerDisp {
             
             Map<String, List<BusDatagram>> tripDatagrams = groupDatagramsByTrip(window.datagrams);
             Map<String, List<Double>> arcVelocities = calculateArcVelocities(tripDatagrams, new Arc[0]);
-            VelocityResult result = calculateAverages(arcVelocities);
             
+            VelocityResult result = new VelocityResult();
             result.arcId = "streaming-" + window.windowId;
             result.processingTime = System.currentTimeMillis() - startTime;
+            result.periodStart = "";
+            result.periodEnd = "";
+            
+            double totalVelocity = 0.0;
+            int totalSamples = 0;
+            for (List<Double> velocities : arcVelocities.values()) {
+                for (Double v : velocities) {
+                    totalVelocity += v;
+                    totalSamples++;
+                }
+            }
+            
+            result.sampleCount = totalSamples;
+            result.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
             
             return result;
         } catch (Exception e) {
@@ -110,6 +157,8 @@ public class VelocityWorker extends _WorkerDisp {
             errorResult.averageVelocity = 0.0;
             errorResult.sampleCount = 0;
             errorResult.processingTime = System.currentTimeMillis() - startTime;
+            errorResult.periodStart = "";
+            errorResult.periodEnd = "";
             return errorResult;
         }
     }
@@ -147,6 +196,15 @@ public class VelocityWorker extends _WorkerDisp {
         
         Map<String, List<Double>> velocitiesByArc = new HashMap<>();
         
+        // Crear mapa de arcos por lineId-startStop-endStop para búsqueda rápida
+        Map<String, Arc> arcLookup = new HashMap<>();
+        for (Arc arc : arcs) {
+            String key = arc.lineId + "-" + arc.startStopId + "-" + arc.endStopId;
+            arcLookup.put(key, arc);
+        }
+        
+        System.out.println("Worker " + workerId + " - Arc lookup created with " + arcLookup.size() + " entries");
+        
         for (List<BusDatagram> tripData : tripDatagrams.values()) {
             if (tripData.size() < 2) continue;
             
@@ -154,28 +212,28 @@ public class VelocityWorker extends _WorkerDisp {
                 BusDatagram d1 = tripData.get(i);
                 BusDatagram d2 = tripData.get(i + 1);
                 
-                Arc arc = findArcForDatagrams(d1, d2, arcs);
+                // Buscar el arco correspondiente usando el lookup
+                String lookupKey = d1.lineId + "-" + d1.stopId + "-" + d2.stopId;
+                Arc arc = arcLookup.get(lookupKey);
+                
                 if (arc != null && arc.distance > 0) {
+                    // USAR EL ARCID DEL ARCO DIRECTAMENTE
                     double velocity = calculateVelocity(d1, d2, arc.distance);
                     if (velocity > 0 && velocity < 50) {
                         velocitiesByArc.computeIfAbsent(arc.arcId, k -> new ArrayList<>()).add(velocity);
+                        System.out.println("Worker " + workerId + " - Matched arc: " + arc.arcId + 
+                                         " velocity: " + String.format("%.2f m/s", velocity));
                     }
+                } else {
+                    System.out.println("Worker " + workerId + " - No arc found for: " + lookupKey);
                 }
             }
         }
         
+        System.out.println("Worker " + workerId + " - Calculated velocities for " + 
+                         velocitiesByArc.size() + " arcs");
+        
         return velocitiesByArc;
-    }
-
-    private Arc findArcForDatagrams(BusDatagram d1, BusDatagram d2, Arc[] arcs) {
-        for (Arc arc : arcs) {
-            if (arc.lineId.equals(d1.lineId)) {
-                if (d1.stopId.equals(arc.startStopId) || d2.stopId.equals(arc.endStopId)) {
-                    return arc;
-                }
-            }
-        }
-        return null;
     }
 
     private double calculateVelocity(BusDatagram d1, BusDatagram d2, double arcDistance) {
@@ -200,22 +258,13 @@ public class VelocityWorker extends _WorkerDisp {
         }
     }
 
-    private VelocityResult calculateAverages(Map<String, List<Double>> arcVelocities) {
-        VelocityResult result = new VelocityResult();
-        result.sampleCount = 0;
-        double totalVelocity = 0.0;
-        int totalSamples = 0;
-        
-        for (List<Double> velocities : arcVelocities.values()) {
-            for (Double velocity : velocities) {
-                totalVelocity += velocity;
-                totalSamples++;
+    private String extractLineIdFromArc(String arcId) {
+        try {
+            if (arcId != null && arcId.contains("_")) {
+                String[] parts = arcId.split("_");
+                if (parts.length >= 2) return parts[1];
             }
-        }
-        
-        result.sampleCount = totalSamples;
-        result.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
-        
-        return result;
+        } catch (Exception ex) {}
+        return "unknown";
     }
 }

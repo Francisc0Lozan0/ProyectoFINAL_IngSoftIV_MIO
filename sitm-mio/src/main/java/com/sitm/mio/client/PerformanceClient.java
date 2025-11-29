@@ -40,7 +40,9 @@ public class PerformanceClient {
         
         try {
             for (int size : testSizes) {
+                System.out.println("\n" + "=".repeat(80));
                 System.out.println("Processing " + size + " datagrams");
+                System.out.println("=".repeat(80));
                 
                 long loadStart = System.currentTimeMillis();
                 
@@ -48,13 +50,14 @@ public class PerformanceClient {
                 BusDatagram[] datagrams = CSVDataLoader.loadDatagrams(datagramFile, size);
                 
                 long loadEnd = System.currentTimeMillis();
-                System.out.println("Load time: " + (loadEnd - loadStart) + "ms");
+                System.out.println("✓ Load time: " + (loadEnd - loadStart) + "ms");
                 
                 if (datagrams.length == 0) {
-                    System.out.println("Could not load datagrams");
+                    System.out.println("⚠ Could not load datagrams");
                     continue;
                 }
                 
+                System.out.println("⚙ Processing " + datagrams.length + " datagrams...");
                 VelocityResult[] results = master.processHistoricalData(datagrams, null, null, null);
                 
                 long processEnd = System.currentTimeMillis();
@@ -62,6 +65,7 @@ public class PerformanceClient {
                 
                 printResults(results, datagrams.length, processTime);
                 
+                // IMPORTANTE: Mostrar el grafo con las velocidades
                 showGraphVisualization(dataPath, results);
                 
                 Thread.sleep(2000);
@@ -75,14 +79,17 @@ public class PerformanceClient {
     
     private void showGraphVisualization(String dataPath, VelocityResult[] results) {
         try {
-            System.out.println("\n Generando visualización del grafo...");
+            System.out.println("\n📊 Generando visualización del grafo con velocidades...");
             
-            // Crear y mostrar el visualizador
+            // Crear visualizador
             GraphVisualizer visualizer = new GraphVisualizer();
             visualizer.loadData(dataPath);
             
+            // CRÍTICO: Cargar las velocidades en el visualizador
+            visualizer.loadVelocities(results);
+            
             // Crear ventana
-            javax.swing.JFrame frame = new javax.swing.JFrame("SITM-MIO - Grafo de Velocidades");
+            javax.swing.JFrame frame = new javax.swing.JFrame("SITM-MIO - Grafo de Velocidades Promedio");
             frame.setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
             frame.add(visualizer);
             frame.pack();
@@ -94,53 +101,65 @@ public class PerformanceClient {
             String outputFile = "grafo_velocidades_" + timestamp + ".jpg";
             visualizer.exportToJPG(outputFile);
             
-            System.out.println(" Visualización guardada en: " + outputFile);
-            System.out.println(" Resumen de velocidades calculadas:");
+            System.out.println("✓ Visualización guardada en: " + outputFile);
+            System.out.println("✓ Ventana interactiva abierta");
             
-            // Mostrar resumen de velocidades por arco
+            // Mostrar resumen de velocidades
+            System.out.println("\n📈 Resumen de velocidades calculadas:");
+            System.out.println("-".repeat(80));
+            
+            int count = 0;
             for (VelocityResult result : results) {
-                if (result.sampleCount > 0) {
-                    System.out.printf("   %s: %.2f m/s (%.1f km/h) - %d muestras%n",
+                if (result.sampleCount > 0 && count < 10) { // Mostrar primeros 10
+                    System.out.printf("   %-30s: %6.2f m/s (%5.1f km/h) - %d muestras%n",
                             result.arcId, result.averageVelocity, 
                             result.averageVelocity * 3.6, result.sampleCount);
+                    count++;
                 }
             }
             
+            if (results.length > 10) {
+                System.out.println("   ... y " + (results.length - 10) + " arcos más");
+            }
+            
         } catch (java.lang.Exception e) {
-            System.err.println("  Error en visualización: " + e.getMessage());
+            System.err.println("⚠ Error en visualización: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
     private void printResults(VelocityResult[] results, int datagramCount, long processTime) {
-        System.out.println("Processing Results");
-        System.out.println("Processing time: " + processTime + "ms");
-        System.out.println("Datagrams processed: " + datagramCount);
-        System.out.println("Results generated: " + results.length);
-        System.out.println("System status: " + master.getSystemStatus());
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("RESULTADOS DEL PROCESAMIENTO");
+        System.out.println("=".repeat(80));
+        
+        System.out.println("⏱ Processing time: " + processTime + "ms");
+        System.out.println("📦 Datagrams processed: " + datagramCount);
+        System.out.println("📊 Results generated: " + results.length);
+        System.out.println("🖥 System status: " + master.getSystemStatus());
         
         int totalSamples = 0;
         double totalVelocity = 0.0;
+        int arcsWithData = 0;
         
         for (VelocityResult result : results) {
-            totalSamples += result.sampleCount;
-            totalVelocity += result.averageVelocity * result.sampleCount;
+            if (result.sampleCount > 0) {
+                totalSamples += result.sampleCount;
+                totalVelocity += result.averageVelocity * result.sampleCount;
+                arcsWithData++;
+            }
         }
         
         double overallAvg = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
         
-        System.out.println("Global Metrics");
-        System.out.printf("Total velocity samples: %d%n", totalSamples);
-        System.out.printf("Global average velocity: %.2f m/s (%.1f km/h)%n", 
+        System.out.println("\n📈 MÉTRICAS GLOBALES");
+        System.out.println("-".repeat(80));
+        System.out.printf("   Total velocity samples: %,d%n", totalSamples);
+        System.out.printf("   Arcs with velocity data: %d / %d%n", arcsWithData, results.length);
+        System.out.printf("   Global average velocity: %.2f m/s (%.1f km/h)%n", 
                 overallAvg, overallAvg * 3.6);
-        System.out.printf("Throughput: %.2f datagrams/second%n", 
+        System.out.printf("   Throughput: %.2f datagrams/second%n", 
                 (double) datagramCount / processTime * 1000);
-        
-        System.out.println("Results by Worker");
-        for (int i = 0; i < Math.min(5, results.length); i++) {
-            VelocityResult r = results[i];
-            System.out.printf("Worker %d: %d samples, %.2f m/s, time: %dms%n",
-                    i, r.sampleCount, r.averageVelocity, r.processingTime);
-        }
     }
     
     public void shutdown() {
@@ -152,7 +171,7 @@ public class PerformanceClient {
     public static void main(String[] args) {
         if (args.length < 1) {
             System.out.println("Usage: PerformanceClient <data_directory>");
-            System.out.println("Example: PerformanceClient /path/to/csv/files");
+            System.out.println("Example: PerformanceClient ./data");
             return;
         }
         
@@ -161,9 +180,12 @@ public class PerformanceClient {
         try {
             client.initialize(args);
             
-            int[] testSizes = {100000, 1000000, 10000000};
+            int[] testSizes = {100000};
             
             client.runTest(args[0], testSizes);
+            
+            System.out.println("\n✓ Pruebas completadas. Presiona ENTER para salir...");
+            System.in.read();
             
         } catch (java.lang.Exception e) {
             System.err.println("Client error: " + e.getMessage());

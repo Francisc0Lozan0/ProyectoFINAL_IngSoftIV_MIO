@@ -17,14 +17,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import javax.imageio.ImageIO;
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 import SITM.MIO.VelocityResult;
@@ -53,14 +50,20 @@ public class GraphVisualizer extends JPanel {
         Stop end;
         int orientation;
         Color color;
+        String arcId;
+        double velocity; // Nueva: velocidad promedio
         
-        Arc(String lineId, String lineName, Stop start, Stop end, int orientation) {
+        Arc(String lineId, String lineName, Stop start, Stop end, int orientation, int sequence) {
             this.lineId = lineId;
             this.lineName = lineName;
             this.start = start;
             this.end = end;
             this.orientation = orientation;
             this.color = generateColor(lineId);
+            this.velocity = 0.0;
+            // Generar arcId igual que en RouteGraphBuilder
+            this.arcId = String.format("ARC_%s_%s_%d_%d", 
+                lineId, orientation == 0 ? "IDA" : "VTA", sequence, sequence + 1);
         }
         
         private static Color generateColor(String lineId) {
@@ -77,6 +80,7 @@ public class GraphVisualizer extends JPanel {
     private Map<String, Stop> stops = new HashMap<>();
     private List<Arc> arcs = new ArrayList<>();
     private Map<String, String> lineNames = new HashMap<>();
+    private Map<String, Double> velocityByArc = new HashMap<>(); // Nueva: mapa de velocidades
     
     private static final int WIDTH = 1920;
     private static final int HEIGHT = 1080;
@@ -94,6 +98,48 @@ public class GraphVisualizer extends JPanel {
         loadLineStops(dataPath + "/linestops.csv");
         calculatePositions();
         System.out.println("Datos cargados exitosamente");
+    }
+    
+    // Nuevo método: cargar velocidades desde VelocityResult[]
+    public void loadVelocities(VelocityResult[] results) {
+        velocityByArc.clear();
+        
+        if (results == null || results.length == 0) {
+            System.out.println("⚠ No hay resultados de velocidad para mostrar");
+            return;
+        }
+        
+        System.out.println("\n🔍 DEBUG: Procesando velocidades...");
+        int loadedCount = 0;
+        for (VelocityResult result : results) {
+            System.out.println("  - Result arcId: '" + result.arcId + "' velocity: " + 
+                             result.averageVelocity + " m/s, samples: " + result.sampleCount);
+            if (result.sampleCount > 0 && result.averageVelocity > 0) {
+                velocityByArc.put(result.arcId, result.averageVelocity);
+                loadedCount++;
+            }
+        }
+        
+        System.out.println("\n🔍 DEBUG: Arcos del grafo:");
+        for (Arc arc : arcs) {
+            System.out.println("  - Graph arcId: '" + arc.arcId + "'");
+        }
+        
+        // Asignar velocidades a los arcos
+        int matchedCount = 0;
+        for (Arc arc : arcs) {
+            if (velocityByArc.containsKey(arc.arcId)) {
+                arc.velocity = velocityByArc.get(arc.arcId);
+                matchedCount++;
+                System.out.println("  ✓ MATCHED: " + arc.arcId + " = " + arc.velocity + " m/s");
+            } else {
+                System.out.println("  ✗ NO MATCH: " + arc.arcId);
+            }
+        }
+        
+        System.out.println("\n✓ Velocidades cargadas: " + loadedCount + " resultados");
+        System.out.println("✓ Arcos coincidentes: " + matchedCount + " / " + arcs.size());
+        repaint();
     }
     
     private void loadStops(String filePath) throws IOException {
@@ -136,7 +182,6 @@ public class GraphVisualizer extends JPanel {
     }
     
     private void loadLineStops(String filePath) throws IOException {
-        // Agrupar por línea y orientación
         Map<String, Map<Integer, List<LineStopData>>> grouped = new HashMap<>();
         
         try (BufferedReader br = Files.newBufferedReader(Paths.get(filePath))) {
@@ -177,7 +222,7 @@ public class GraphVisualizer extends JPanel {
                     Stop end = stops.get(sequence.get(i + 1).stopId);
                     
                     if (start != null && end != null) {
-                        arcs.add(new Arc(lineId, lineName, start, end, orientation));
+                        arcs.add(new Arc(lineId, lineName, start, end, orientation, sequence.get(i).sequence));
                     }
                 }
             }
@@ -187,7 +232,6 @@ public class GraphVisualizer extends JPanel {
     private void calculatePositions() {
         if (stops.isEmpty()) return;
         
-        // Encontrar límites geográficos
         double minLat = Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
         double minLon = Double.MAX_VALUE, maxLon = -Double.MAX_VALUE;
         
@@ -198,7 +242,6 @@ public class GraphVisualizer extends JPanel {
             maxLon = Math.max(maxLon, stop.longitude);
         }
         
-        // Mapear coordenadas geográficas a coordenadas de pantalla
         double latRange = maxLat - minLat;
         double lonRange = maxLon - minLon;
         
@@ -214,28 +257,45 @@ public class GraphVisualizer extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
         
-        // Anti-aliasing
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         
         // Título
         g2.setColor(Color.BLACK);
         g2.setFont(new Font("Arial", Font.BOLD, 24));
-        g2.drawString("GRAFO DE RUTAS SITM-MIO", WIDTH / 2 - 150, 40);
+        g2.drawString("GRAFO DE RUTAS SITM-MIO - VELOCIDADES PROMEDIO", WIDTH / 2 - 300, 40);
         
-        // Dibujar arcos
-        g2.setStroke(new BasicStroke(2f));
+        // Dibujar arcos con velocidades
         for (Arc arc : arcs) {
             if (arc.start.position != null && arc.end.position != null) {
-                g2.setColor(new Color(arc.color.getRed(), arc.color.getGreen(), arc.color.getBlue(), 150));
+                // Color según velocidad
+                Color arcColor = getColorForVelocity(arc.velocity);
+                g2.setColor(arcColor);
+                g2.setStroke(new BasicStroke(3f));
                 
-                // Línea con flecha
-                drawArrow(g2, 
-                    (int) arc.start.position.getX(), 
-                    (int) arc.start.position.getY(),
-                    (int) arc.end.position.getX(), 
-                    (int) arc.end.position.getY()
-                );
+                int x1 = (int) arc.start.position.getX();
+                int y1 = (int) arc.start.position.getY();
+                int x2 = (int) arc.end.position.getX();
+                int y2 = (int) arc.end.position.getY();
+                
+                drawArrow(g2, x1, y1, x2, y2);
+                
+                // Dibujar velocidad en el medio del arco
+                if (arc.velocity > 0) {
+                    int midX = (x1 + x2) / 2;
+                    int midY = (y1 + y2) / 2;
+                    
+                    g2.setFont(new Font("Arial", Font.BOLD, 11));
+                    g2.setColor(Color.WHITE);
+                    String velText = String.format("%.1f km/h", arc.velocity * 3.6);
+                    
+                    // Fondo para el texto
+                    int textWidth = g2.getFontMetrics().stringWidth(velText);
+                    g2.fillRect(midX - textWidth/2 - 3, midY - 10, textWidth + 6, 16);
+                    
+                    g2.setColor(Color.BLACK);
+                    g2.drawString(velText, midX - textWidth/2, midY + 3);
+                }
             }
         }
         
@@ -245,33 +305,48 @@ public class GraphVisualizer extends JPanel {
                 int x = (int) stop.position.getX();
                 int y = (int) stop.position.getY();
                 
-                // Nodo
                 g2.setColor(new Color(70, 130, 180));
-                g2.fillOval(x - 5, y - 5, 10, 10);
+                g2.fillOval(x - 6, y - 6, 12, 12);
                 
-                // Borde
                 g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(1.5f));
-                g2.drawOval(x - 5, y - 5, 10, 10);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawOval(x - 6, y - 6, 12, 12);
             }
         }
         
-        // Leyenda
-        drawLegend(g2);
+        // Leyenda con escala de colores
+        drawLegendWithScale(g2);
         
-        // Info
-        g2.setColor(Color.DARK_GRAY);
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString(String.format("Paradas: %d  |  Arcos: %d  |  Rutas: %d", 
-            stops.size(), arcs.size(), lineNames.size()), 20, HEIGHT - 20);
+        // Estadísticas
+        drawStatistics(g2);
+    }
+    
+    private Color getColorForVelocity(double velocity) {
+        if (velocity <= 0) {
+            return new Color(150, 150, 150, 180); // Gris para sin datos
+        }
+        
+        double kmh = velocity * 3.6;
+        
+        // Escala de colores: rojo (lento) -> amarillo -> verde (rápido)
+        if (kmh < 10) {
+            return new Color(220, 20, 20, 200); // Rojo oscuro (muy lento)
+        } else if (kmh < 20) {
+            return new Color(255, 100, 0, 200); // Naranja (lento)
+        } else if (kmh < 30) {
+            return new Color(255, 200, 0, 200); // Amarillo (medio)
+        } else if (kmh < 40) {
+            return new Color(180, 220, 50, 200); // Verde-amarillo (bueno)
+        } else {
+            return new Color(50, 200, 50, 200); // Verde (rápido)
+        }
     }
     
     private void drawArrow(Graphics2D g2, int x1, int y1, int x2, int y2) {
         g2.drawLine(x1, y1, x2, y2);
         
-        // Flecha
         double angle = Math.atan2(y2 - y1, x2 - x1);
-        int arrowSize = 8;
+        int arrowSize = 10;
         
         int[] xPoints = {
             x2,
@@ -287,43 +362,73 @@ public class GraphVisualizer extends JPanel {
         g2.fillPolygon(xPoints, yPoints, 3);
     }
     
-    private void drawLegend(Graphics2D g2) {
-        int x = WIDTH - 300;
+    private void drawLegendWithScale(Graphics2D g2) {
+        int x = WIDTH - 320;
         int y = 80;
         
-        g2.setColor(new Color(255, 255, 255, 200));
-        g2.fillRoundRect(x - 10, y - 30, 280, 150, 10, 10);
+        g2.setColor(new Color(255, 255, 255, 230));
+        g2.fillRoundRect(x - 10, y - 30, 300, 200, 10, 10);
         
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(1f));
-        g2.drawRoundRect(x - 10, y - 30, 280, 150, 10, 10);
+        g2.drawRoundRect(x - 10, y - 30, 300, 200, 10, 10);
         
         g2.setFont(new Font("Arial", Font.BOLD, 14));
-        g2.drawString("LEYENDA", x, y);
+        g2.drawString("ESCALA DE VELOCIDADES", x, y);
         
         y += 25;
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
         
-        // Parada
-        g2.setColor(new Color(70, 130, 180));
-        g2.fillOval(x, y - 5, 10, 10);
-        g2.setColor(Color.BLACK);
-        g2.drawString("Parada", x + 20, y + 5);
+        // Escala de colores
+        String[][] scale = {
+            {"< 10 km/h", "220,20,20"},
+            {"10-20 km/h", "255,100,0"},
+            {"20-30 km/h", "255,200,0"},
+            {"30-40 km/h", "180,220,50"},
+            {"> 40 km/h", "50,200,50"},
+            {"Sin datos", "150,150,150"}
+        };
         
-        // Arco
-        y += 25;
-        Set<String> uniqueLines = new HashSet<>();
+        for (String[] entry : scale) {
+            String[] rgb = entry[1].split(",");
+            g2.setColor(new Color(
+                Integer.parseInt(rgb[0]),
+                Integer.parseInt(rgb[1]),
+                Integer.parseInt(rgb[2])
+            ));
+            g2.fillRect(x, y - 8, 30, 15);
+            g2.setColor(Color.BLACK);
+            g2.drawRect(x, y - 8, 30, 15);
+            g2.drawString(entry[0], x + 40, y + 4);
+            y += 22;
+        }
+    }
+    
+    private void drawStatistics(Graphics2D g2) {
+        g2.setColor(Color.DARK_GRAY);
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        int arcsWithVelocity = 0;
+        double totalVelocity = 0;
+        double maxVel = 0, minVel = Double.MAX_VALUE;
+        
         for (Arc arc : arcs) {
-            if (uniqueLines.size() >= 3) break;
-            if (uniqueLines.add(arc.lineId)) {
-                g2.setColor(arc.color);
-                g2.setStroke(new BasicStroke(2f));
-                g2.drawLine(x, y, x + 15, y);
-                g2.setColor(Color.BLACK);
-                g2.drawString(arc.lineName, x + 20, y + 5);
-                y += 20;
+            if (arc.velocity > 0) {
+                arcsWithVelocity++;
+                totalVelocity += arc.velocity;
+                maxVel = Math.max(maxVel, arc.velocity);
+                minVel = Math.min(minVel, arc.velocity);
             }
         }
+        
+        double avgVel = arcsWithVelocity > 0 ? totalVelocity / arcsWithVelocity : 0;
+        
+        String stats = String.format(
+            "Paradas: %d  |  Arcos: %d  |  Con velocidad: %d  |  Promedio: %.1f km/h  |  Máx: %.1f km/h  |  Mín: %.1f km/h",
+            stops.size(), arcs.size(), arcsWithVelocity, avgVel * 3.6, maxVel * 3.6, minVel == Double.MAX_VALUE ? 0 : minVel * 3.6
+        );
+        
+        g2.drawString(stats, 20, HEIGHT - 20);
     }
     
     public void exportToJPG(String filename) throws IOException {
@@ -337,22 +442,8 @@ public class GraphVisualizer extends JPanel {
         g2.dispose();
         
         ImageIO.write(image, "jpg", new File(filename));
-        System.out.println("Grafo exportado a: " + filename);
+        System.out.println("✓ Grafo exportado a: " + filename);
     }
-
-public void displayVelocityResults(VelocityResult[] results) {
-    // Crear un mapa de velocidades por arco
-    Map<String, Double> velocityByArc = new HashMap<>();
-    for (VelocityResult result : results) {
-        if (result.sampleCount > 0) {
-            velocityByArc.put(result.arcId, result.averageVelocity);
-        }
-    }
-    
-
-    System.out.println("Velocidades cargadas para " + velocityByArc.size() + " arcos");
-    repaint();
-}
     
     static class LineStopData {
         int sequence;
@@ -365,40 +456,6 @@ public void displayVelocityResults(VelocityResult[] results) {
             this.orientation = orient;
             this.lineId = line;
             this.stopId = stop;
-        }
-    }
-    
-    public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Uso: GraphVisualizer <directorio_datos> [archivo_salida.jpg]");
-            System.out.println("Ejemplo: GraphVisualizer ./sitm-mio/data grafo_mio.jpg");
-            System.exit(1);
-        }
-        
-        String dataPath = args[0];
-        String outputFile = args.length > 1 ? args[1] : "grafo_sitm_mio.jpg";
-        
-        try {
-            GraphVisualizer visualizer = new GraphVisualizer();
-            visualizer.loadData(dataPath);
-            
-            // Mostrar en ventana
-            JFrame frame = new JFrame("Grafo SITM-MIO");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.add(visualizer);
-            frame.pack();
-            frame.setLocationRelativeTo(null);
-            frame.setVisible(true);
-            
-            // Exportar a JPG
-            visualizer.exportToJPG(outputFile);
-            
-            System.out.println("Visualización completada");
-            System.out.println("Presiona Ctrl+C para cerrar");
-            
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 }

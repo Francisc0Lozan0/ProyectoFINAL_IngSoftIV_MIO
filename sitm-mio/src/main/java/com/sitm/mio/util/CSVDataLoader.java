@@ -46,28 +46,28 @@ public class CSVDataLoader {
         return datagrams.toArray(new BusDatagram[0]);
     }
 
-private static BusDatagram parseDatagram(String line) {
-    try {
-        String[] parts = line.split(",");
-        if (parts.length < 11) return null;
-        
-        BusDatagram dgram = new BusDatagram();
-        dgram.eventType = Integer.parseInt(parts[0].trim());
-        dgram.stopId = parts[2].trim();
-        dgram.odometer = Double.parseDouble(parts[3].trim());
-        dgram.latitude = parseCoordinate(parts[4].trim());
-        dgram.longitude = parseCoordinate(parts[5].trim());
-        dgram.lineId = parts[6].trim();   
-        dgram.tripId = parts[7].trim();    
-        dgram.datagramDate = parts[9].trim(); 
-        dgram.busId = parts[10].trim();    
-        
-        return dgram;
-    } catch (Exception e) {
-        System.err.println("Error parsing datagram: " + line);
-        return null;
+    private static BusDatagram parseDatagram(String line) {
+        try {
+            String[] parts = line.split(",");
+            if (parts.length < 11) return null;
+            
+            BusDatagram dgram = new BusDatagram();
+            dgram.eventType = Integer.parseInt(parts[0].trim());
+            dgram.stopId = parts[2].trim();
+            dgram.odometer = Double.parseDouble(parts[3].trim());
+            dgram.latitude = parseCoordinate(parts[4].trim());
+            dgram.longitude = parseCoordinate(parts[5].trim());
+            dgram.lineId = parts[6].trim();   
+            dgram.tripId = parts[7].trim();    
+            dgram.datagramDate = parts[9].trim(); 
+            dgram.busId = parts[10].trim();    
+            
+            return dgram;
+        } catch (Exception e) {
+            System.err.println("Error parsing datagram: " + line);
+            return null;
+        }
     }
-}
 
     private static double parseCoordinate(String coord) {
         try {
@@ -167,42 +167,92 @@ private static BusDatagram parseDatagram(String line) {
     }
 
     public static Arc[] buildArcs(SITM.MIO.LineStop[] lineStops, Stop[] stops) {
-        Map<String, List<SITM.MIO.LineStop>> stopsByLine = new HashMap<>();
+        // Agrupar por línea Y orientación
+        Map<String, Map<Integer, List<SITM.MIO.LineStop>>> stopsByLineAndOrientation = new HashMap<>();
         List<Arc> arcs = new ArrayList<>();
         
-        for (SITM.MIO.LineStop ls : lineStops) {
-            stopsByLine.computeIfAbsent(ls.lineId, k -> new ArrayList<>()).add(ls);
-        }
+        // Primero necesitamos cargar la orientación desde linestops.csv
+        // Vamos a asumir orientación 0 (IDA) por defecto
+        // Para una implementación completa, deberías cargar la columna ORIENTATION del CSV
         
-        for (Map.Entry<String, List<SITM.MIO.LineStop>> entry : stopsByLine.entrySet()) {
-            List<SITM.MIO.LineStop> lineStopList = entry.getValue();
-            lineStopList.sort(Comparator.comparingInt(ls -> ls.stopSequence));
+        try (BufferedReader br = Files.newBufferedReader(Paths.get("./data/linestops.csv"))) {
+            String line;
+            boolean firstLine = true;
             
-            for (int i = 0; i < lineStopList.size() - 1; i++) {
-                SITM.MIO.LineStop start = lineStopList.get(i);
-                SITM.MIO.LineStop end = lineStopList.get(i+1);
-                
-                Arc arc = new Arc();
-                arc.arcId = "ARC_" + entry.getKey() + "_" + start.stopSequence + "_" + end.stopSequence;
-                arc.lineId = entry.getKey();
-                arc.startStopId = start.stopId;
-                arc.endStopId = end.stopId;
-                arc.orderIndex = start.stopSequence;
-                
-                Stop startStop = findStop(stops, start.stopId);
-                Stop endStop = findStop(stops, end.stopId);
-                if (startStop != null && endStop != null) {
-                    arc.distance = calculateDistance(
-                        startStop.latitude, startStop.longitude,
-                        endStop.latitude, endStop.longitude
-                    );
+            while ((line = br.readLine()) != null) {
+                if (firstLine) {
+                    firstLine = false;
+                    continue;
                 }
                 
-                arcs.add(arc);
+                String[] parts = line.split(",");
+                if (parts.length < 6) continue;
+                
+                int sequence = Integer.parseInt(parts[1].trim());
+                int orientation = Integer.parseInt(parts[2].trim()); // CRITICAL: Leer la orientación
+                String lineId = parts[3].trim();
+                String stopId = parts[4].trim();
+                
+                SITM.MIO.LineStop ls = new SITM.MIO.LineStop();
+                ls.lineId = lineId;
+                ls.stopId = stopId;
+                ls.stopSequence = sequence;
+                
+                stopsByLineAndOrientation
+                    .computeIfAbsent(lineId, k -> new HashMap<>())
+                    .computeIfAbsent(orientation, k -> new ArrayList<>())
+                    .add(ls);
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading orientations: " + e.getMessage());
+        }
+        
+        // Construir arcos con orientación incluida
+        for (Map.Entry<String, Map<Integer, List<SITM.MIO.LineStop>>> lineEntry : stopsByLineAndOrientation.entrySet()) {
+            String lineId = lineEntry.getKey();
+            
+            for (Map.Entry<Integer, List<SITM.MIO.LineStop>> orientEntry : lineEntry.getValue().entrySet()) {
+                int orientation = orientEntry.getKey();
+                List<SITM.MIO.LineStop> lineStopList = orientEntry.getValue();
+                lineStopList.sort(Comparator.comparingInt(ls -> ls.stopSequence));
+                
+                for (int i = 0; i < lineStopList.size() - 1; i++) {
+                    SITM.MIO.LineStop start = lineStopList.get(i);
+                    SITM.MIO.LineStop end = lineStopList.get(i+1);
+                    
+                    Arc arc = new Arc();
+                    // CRITICAL: Incluir orientación en el arcId
+                    String orientStr = orientation == 0 ? "IDA" : "VTA";
+                    arc.arcId = String.format("ARC_%s_%s_%d_%d", 
+                        lineId, orientStr, start.stopSequence, end.stopSequence);
+                    arc.lineId = lineId;
+                    arc.startStopId = start.stopId;
+                    arc.endStopId = end.stopId;
+                    arc.orderIndex = start.stopSequence;
+                    
+                    Stop startStop = findStop(stops, start.stopId);
+                    Stop endStop = findStop(stops, end.stopId);
+                    if (startStop != null && endStop != null) {
+                        arc.distance = calculateDistance(
+                            startStop.latitude, startStop.longitude,
+                            endStop.latitude, endStop.longitude
+                        );
+                    }
+                    
+                    arcs.add(arc);
+                }
             }
         }
         
         System.out.println("Total arcs built: " + arcs.size());
+        
+        // DEBUG: Imprimir algunos arcos
+        System.out.println("Sample arcs created:");
+        for (int i = 0; i < Math.min(5, arcs.size()); i++) {
+            Arc arc = arcs.get(i);
+            System.out.println("  " + arc.arcId + " (" + arc.startStopId + " -> " + arc.endStopId + ")");
+        }
+        
         return arcs.toArray(new Arc[0]);
     }
 
