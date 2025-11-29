@@ -26,10 +26,10 @@ module MIO {
         string lineId;
         string startStopId;
         string endStopId;
-        int sequence;
+        int orderIndex;     // Cambiado de "sequence"
         double distance;
     };
-    
+
     struct VelocityResult {
         string arcId;
         double averageVelocity;
@@ -38,36 +38,47 @@ module MIO {
         string periodStart;
         string periodEnd;
     };
-    
+
+    // --- Ahora SÍ declaramos las secuencias, después de los structs ---
+    sequence<BusDatagram> BusDatagramSeq;
+    sequence<Arc> ArcSeq;
+    sequence<Stop> StopSeq;
+    sequence<VelocityResult> VelocityResultSeq;
+
     struct ProcessingTask {
         string taskId;
-        sequence<BusDatagram> datagrams;
-        sequence<Arc> arcs;
-        sequence<Stop> stops;
+        BusDatagramSeq datagrams;
+        ArcSeq arcs;
+        StopSeq stops;
         int totalWorkers;
         int workerId;
     };
     
     struct StreamingWindow {
         string windowId;
-        sequence<BusDatagram> datagrams;
+        BusDatagramSeq datagrams;
         long startTimestamp;
         long endTimestamp;
     };
-    
+
     interface Worker {
         idempotent VelocityResult processTask(ProcessingTask task);
         idempotent bool isAlive();
         idempotent VelocityResult processStreamingWindow(StreamingWindow window);
     };
-    
+
     interface Master {
         void registerWorker(Worker worker);
         void unregisterWorker(Worker worker);
-        sequence<VelocityResult> processHistoricalData(sequence<BusDatagram> data, 
-                                                      sequence<Arc> arcs,
-                                                      sequence<Stop> stops);
-        sequence<VelocityResult> processStreamingData(StreamingWindow window);
+
+        VelocityResultSeq processHistoricalData(
+            BusDatagramSeq data,
+            ArcSeq arcs,
+            StopSeq stops
+        );
+
+        VelocityResultSeq processStreamingData(StreamingWindow window);
+
         string getSystemStatus();
     };
 
