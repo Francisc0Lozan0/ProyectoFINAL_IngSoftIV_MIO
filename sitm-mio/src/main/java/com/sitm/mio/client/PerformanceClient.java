@@ -53,21 +53,32 @@ public class PerformanceClient {
     }
 
     /**
-     * Procesa los archivos con batches MUY pequeños pero ESTABLES
+     * Procesa TODOS los archivos con batches MUY pequeños pero ESTABLES
      */
     public void runUltraStableProcessing(String dataPath) {
         System.out.println("SITM-MIO - MODO ULTRA-ESTABLE (Batches PEQUEÑOS)");
         System.out.println("Directorio de datos: " + dataPath);
 
+        // TODOS LOS ARCHIVOS - desde 1,000 hasta 100 millones
         String[] testFiles = {
+            dataPath + "/datagrams_1000.csv",
+            dataPath + "/datagrams_10000.csv",
+            dataPath + "/datagrams_100000.csv",
             dataPath + "/datagrams_1M.csv",
             dataPath + "/datagrams_10M.csv", 
             dataPath + "/datagrams_100M.csv"
         };
 
-        String[] fileLabels = { "1 MILLÓN", "10 MILLONES", "100 MILLONES" };
+        String[] fileLabels = { 
+            "1 MIL", 
+            "10 MIL", 
+            "100 MIL", 
+            "1 MILLÓN", 
+            "10 MILLONES", 
+            "100 MILLONES" 
+        };
 
-        System.out.println("\n🎯 PROCESANDO CON BATCHES PEQUEÑOS:");
+        System.out.println("\n🎯 PROCESANDO TODOS LOS ARCHIVOS CON BATCHES PEQUEÑOS:");
         for (int i = 0; i < testFiles.length; i++) {
             System.out.printf("  %d. %s → %s%n", i + 1, testFiles[i], fileLabels[i]);
         }
@@ -170,8 +181,9 @@ public class PerformanceClient {
                     // PAUSAS MÁS LARGAS Y FRECUENTES
                     applyConservativePause(batchNumber, successfulBatches);
                     
-                    // Mostrar progreso cada 50 lotes
-                    if (batchNumber % 50 == 0) {
+                    // Mostrar progreso cada 50 lotes (o más frecuente para archivos pequeños)
+                    int progressInterval = label.contains("MIL") ? 10 : 50;
+                    if (batchNumber % progressInterval == 0) {
                         double progress = (totalProcessed * 100.0) / estimatedLines;
                         System.out.printf("📈 Progreso: %,d/%,d (%.1f%%) - Lotes exitosos: %d/%d%n",
                                 totalProcessed, estimatedLines, progress, successfulBatches, batchNumber);
@@ -375,6 +387,14 @@ public class PerformanceClient {
             System.out.println("  • Pausas frecuentes entre lotes");
             System.out.println("  • Prioriza COMPLETAR sobre velocidad");
             System.out.println("  • Persistencia AUTOMÁTICA de todos los datos");
+            System.out.println("");
+            System.out.println("ARCHIVOS A PROCESAR:");
+            System.out.println("  • datagrams_1000.csv (1 MIL)");
+            System.out.println("  • datagrams_10000.csv (10 MIL)");
+            System.out.println("  • datagrams_100000.csv (100 MIL)");
+            System.out.println("  • datagrams_1M.csv (1 MILLÓN)");
+            System.out.println("  • datagrams_10M.csv (10 MILLONES)");
+            System.out.println("  • datagrams_100M.csv (100 MILLONES)");
             return;
         }
 
