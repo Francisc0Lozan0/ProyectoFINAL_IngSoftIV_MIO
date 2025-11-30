@@ -20,8 +20,8 @@ import SITM.MIO.MasterPrxHelper;
 import SITM.MIO.VelocityResult;
 
 /**
- * Cliente para procesamiento de datos HISTÓRICOS masivos (36GB+)
- * Usa batch processing con streaming para no saturar memoria
+ * Cliente para procesamiento de datos HISTÓRICOS masivos
+ * CON ODÓMETRO REAL
  */
 public class HistoricalBatchClient {
     
@@ -43,15 +43,16 @@ public class HistoricalBatchClient {
             throw new Error("Invalid master proxy");
         }
         
-        System.out.println("✓ Conectado al Master en: " + masterEndpoint);
+        System.out.println("✓ Conectado al Master: " + masterEndpoint);
+        System.out.println("✓ Formato: CSV Real con ODÓMETRO");
     }
     
     /**
-     * Procesa archivo histórico grande por lotes - OPTIMIZADO PARA 36GB
+     * Procesa archivo histórico grande por lotes
      */
     public void processHistoricalFile(String filePath, String dataPath) {
         System.out.println("\n" + "=".repeat(80));
-        System.out.println("PROCESAMIENTO HISTÓRICO - DATOS MASIVOS (36GB+)");
+        System.out.println("PROCESAMIENTO HISTÓRICO - ODÓMETRO REAL");
         System.out.println("=".repeat(80));
         System.out.println("Archivo: " + filePath);
         
@@ -60,15 +61,15 @@ public class HistoricalBatchClient {
             long fileSize = StreamingDatagramReader.getFileSize(filePath);
             long estimatedLines = StreamingDatagramReader.countLines(filePath);
             
-            System.out.println("\n📊 ANÁLISIS DEL ARCHIVO:");
+            System.out.println("\n📊 ANÁLISIS:");
             System.out.printf("  • Tamaño: %.2f GB%n", fileSize / (1024.0 * 1024.0 * 1024.0));
-            System.out.printf("  • Líneas estimadas: %,d%n", estimatedLines);
+            System.out.printf("  • Líneas: %,d%n", estimatedLines);
             
-            // 2. Configurar tamaño de lote según configuración
+            // 2. Configurar batch size
             ConfigManager config = ConfigManager.getInstance();
-            int batchSize = config.getInt("processing.batch.size", 100000); // Aumentado para 36GB
-            System.out.println("\n🖥 Estado del cluster: " + master.getSystemStatus());
-            System.out.printf("  • Tamaño de lote: %,d datagramas%n", batchSize);
+            int batchSize = config.getInt("processing.batch.size", 1000);
+            System.out.println("\n🖥 Cluster: " + master.getSystemStatus());
+            System.out.printf("  • Batch size: %,d%n", batchSize);
             
             // 3. Procesamiento por lotes
             long globalStartTime = System.currentTimeMillis();
@@ -76,6 +77,7 @@ public class HistoricalBatchClient {
             int batchNumber = 0;
             long totalProcessed = 0;
             
+            // USAR CONSTRUCTOR CORRECTO (2 parámetros)
             try (StreamingDatagramReader reader = new StreamingDatagramReader(filePath, batchSize)) {
                 
                 BusDatagram[] batch;
@@ -87,25 +89,21 @@ public class HistoricalBatchClient {
                     
                     long batchStartTime = System.currentTimeMillis();
                     
-                    // Enviar lote al cluster distribuido - CORREGIDO: solo 3 parámetros
                     VelocityResult[] batchResults = master.processHistoricalData(batch, null, null);
                     
                     long batchEndTime = System.currentTimeMillis();
                     long batchTime = batchEndTime - batchStartTime;
                     
-                    // Agregar resultados
                     allResults.addAll(Arrays.asList(batchResults));
                     totalProcessed += batch.length;
                     
-                    // Métricas del lote
                     double throughput = (batch.length / (double) batchTime) * 1000;
                     System.out.printf("  ⏱ Tiempo: %,d ms%n", batchTime);
-                    System.out.printf("  ⚡ Throughput: %.2f datagramas/seg%n", throughput);
+                    System.out.printf("  ⚡ Throughput: %.2f dps%n", throughput);
                     System.out.printf("  📈 Progreso: %,d / %,d (%.1f%%)%n", 
                         totalProcessed, estimatedLines, 
                         (totalProcessed * 100.0 / estimatedLines));
                     
-                    // Pausa para evitar saturar el cluster
                     if (batchNumber % 10 == 0) {
                         Thread.sleep(500);
                     }
@@ -115,10 +113,8 @@ public class HistoricalBatchClient {
             long globalEndTime = System.currentTimeMillis();
             long totalTime = globalEndTime - globalStartTime;
             
-            // 4. Resultados consolidados
             printConsolidatedResults(allResults, totalProcessed, totalTime, batchNumber);
             
-            // 5. Visualización (solo si hay resultados)
             if (allResults.size() > 0) {
                 generateVisualization(dataPath, allResults);
             }
@@ -137,23 +133,20 @@ public class HistoricalBatchClient {
                                          long totalTime,
                                          int totalBatches) {
         System.out.println("\n" + "=".repeat(80));
-        System.out.println("RESULTADOS CONSOLIDADOS - PROCESAMIENTO HISTÓRICO");
+        System.out.println("RESULTADOS CONSOLIDADOS");
         System.out.println("=".repeat(80));
         
-        System.out.printf("📦 Datagramas procesados: %,d%n", totalProcessed);
-        System.out.printf("⏱ Tiempo total: %,d ms (%.2f minutos)%n", 
+        System.out.printf("📦 Datagramas: %,d%n", totalProcessed);
+        System.out.printf("⏱ Tiempo: %,d ms (%.2f min)%n", 
             totalTime, totalTime / 60000.0);
-        System.out.printf("🔢 Lotes procesados: %d%n", totalBatches);
+        System.out.printf("🔢 Lotes: %d%n", totalBatches);
         
-        // CORREGIDO: Evitar división por cero
         double globalThroughput = totalTime > 0 ? (totalProcessed / (double) totalTime) * 1000 : 0;
-        System.out.printf("⚡ Throughput global: %.2f datagramas/seg%n", globalThroughput);
+        System.out.printf("⚡ Throughput: %.2f dps%n", globalThroughput);
         
-        // Consolidar resultados por arco
         Map<String, ArcStats> statsByArc = new HashMap<>();
         
         for (VelocityResult result : results) {
-            // FILTRO CRÍTICO: Solo considerar resultados válidos
             if (result.sampleCount > 0 && result.averageVelocity > 0) {
                 ArcStats stats = statsByArc.computeIfAbsent(
                     result.arcId, 
@@ -165,25 +158,23 @@ public class HistoricalBatchClient {
             }
         }
         
-        System.out.println("\n📊 ESTADÍSTICAS GLOBALES:");
-        System.out.printf("  • Arcos con datos: %,d%n", statsByArc.size());
-        System.out.printf("  • Muestras totales: %,d%n", 
+        System.out.println("\n📊 ESTADÍSTICAS:");
+        System.out.printf("  • Arcos: %,d%n", statsByArc.size());
+        System.out.printf("  • Muestras: %,d%n", 
             statsByArc.values().stream().mapToLong(s -> s.totalSamples).sum());
         
-        // Cálculo seguro del promedio global
         double globalAvg = statsByArc.values().stream()
             .filter(s -> s.totalSamples > 0)
             .mapToDouble(s -> s.totalVelocity / s.totalSamples)
             .average()
             .orElse(0.0);
         
-        System.out.printf("  • Velocidad promedio global: %.2f m/s (%.1f km/h)%n", 
+        System.out.printf("  • Velocidad promedio: %.2f m/s (%.1f km/h)%n", 
             globalAvg, globalAvg * 3.6);
         
-        // Top 10 arcos más rápidos (solo con muestras suficientes)
         System.out.println("\n🏆 TOP 10 ARCOS MÁS RÁPIDOS:");
         statsByArc.entrySet().stream()
-            .filter(e -> e.getValue().totalSamples >= 50) // Mínimo 50 muestras para estadística confiable
+            .filter(e -> e.getValue().totalSamples >= 50)
             .sorted((a, b) -> Double.compare(
                 b.getValue().getAverageVelocity(),
                 a.getValue().getAverageVelocity()
@@ -195,34 +186,18 @@ public class HistoricalBatchClient {
                 System.out.printf("  %s: %.2f km/h (%,d muestras)%n", 
                     e.getKey(), avg * 3.6, stats.totalSamples);
             });
-            
-        // También mostrar arcos más lentos para análisis
-        System.out.println("\n🐢 TOP 5 ARCOS MÁS LENTOS:");
-        statsByArc.entrySet().stream()
-            .filter(e -> e.getValue().totalSamples >= 50)
-            .sorted((a, b) -> Double.compare(
-                a.getValue().getAverageVelocity(),
-                b.getValue().getAverageVelocity()
-            ))
-            .limit(5)
-            .forEach(e -> {
-                ArcStats stats = e.getValue();
-                double avg = stats.getAverageVelocity();
-                System.out.printf("  %s: %.2f km/h (%,d muestras)%n", 
-                    e.getKey(), avg * 3.6, stats.totalSamples);
-            });
     }
     
     private void generateVisualization(String dataPath, List<VelocityResult> results) {
         try {
-            System.out.println("\n📊 Generando visualización del grafo...");
+            System.out.println("\n📊 Generando visualización...");
             
             GraphVisualizer visualizer = new GraphVisualizer();
             visualizer.loadData(dataPath);
             visualizer.loadVelocities(results.toArray(new VelocityResult[0]));
             
             javax.swing.JFrame frame = new javax.swing.JFrame(
-                "SITM-MIO - Velocidades Históricas (36GB procesados)"
+                "SITM-MIO - Velocidades Históricas (ODÓMETRO)"
             );
             frame.setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
             frame.add(visualizer);
@@ -234,7 +209,7 @@ public class HistoricalBatchClient {
             String outputFile = "grafo_historico_" + timestamp + ".jpg";
             visualizer.exportToJPG(outputFile);
             
-            System.out.println("✓ Visualización guardada: " + outputFile);
+            System.out.println("✓ Visualización: " + outputFile);
             
         } catch (Exception e) {
             System.err.println("⚠ Error en visualización: " + e.getMessage());
@@ -258,9 +233,11 @@ public class HistoricalBatchClient {
     
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Uso: HistoricalBatchClient <archivo_csv_historico> <directorio_datos>");
-            System.out.println("Ejemplo: HistoricalBatchClient ./data/datagrams_36gb.csv ./data");
-            System.out.println("NOTA: Para archivos de 36GB+, usar batch size de 100,000 en config");
+            System.out.println("Uso: HistoricalBatchClient <archivo_csv> <directorio_datos>");
+            System.out.println("Ejemplo: HistoricalBatchClient ./data/datagrams.csv ./data");
+            System.out.println("");
+            System.out.println("FORMATO CSV REAL:");
+            System.out.println("  eventType,date,stopId,odometer,lat,lon,taskId,lineId,tripId,unknown,timestamp,busId");
             return;
         }
         
@@ -273,7 +250,7 @@ public class HistoricalBatchClient {
             client.initialize(args);
             client.processHistoricalFile(historicalFile, dataPath);
             
-            System.out.println("\n✓ Procesamiento histórico de 36GB completado exitosamente.");
+            System.out.println("\n✓ Completado");
             System.out.println("Presiona ENTER para salir...");
             System.in.read();
             

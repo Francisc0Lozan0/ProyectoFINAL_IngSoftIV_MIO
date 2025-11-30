@@ -10,10 +10,11 @@ import java.util.List;
 import SITM.MIO.BusDatagram;
 
 /**
- * Lector de datagramas con procesamiento por lotes (streaming)
- * para manejar archivos enormes (36GB+) sin cargar todo en memoria.
+ * Lector de datagramas con el FORMATO CSV REAL de SITM-MIO
  * 
- * Patrón: Iterator + Batch Processing
+ * Formato del CSV real:
+ * eventType,registerdate,stopId,odometer,latitude,longitude,taskId,lineId,tripId,unknown1,datagramDate,busId
+ * 0,28-MAY-19,513327,70,34761183,-764873683,757,2241,159,1365,2019-05-27 20:14:43,1069
  */
 public class StreamingDatagramReader implements AutoCloseable {
     
@@ -23,8 +24,9 @@ public class StreamingDatagramReader implements AutoCloseable {
     private long totalRead = 0;
     
     /**
+     * Constructor principal
      * @param filePath Ruta al archivo CSV
-     * @param batchSize Tamaño del lote (ej: 50000 para ~5MB por lote)
+     * @param batchSize Tamaño del lote
      */
     public StreamingDatagramReader(String filePath, int batchSize) throws IOException {
         this.reader = Files.newBufferedReader(Paths.get(filePath));
@@ -32,13 +34,21 @@ public class StreamingDatagramReader implements AutoCloseable {
     }
     
     /**
-     * Lee el siguiente lote de datagramas sin cargar todo el archivo
-     * @return Lista de datagramas del lote, o null si no hay más datos
+     * Constructor legacy (compatible con código antiguo)
+     * @deprecated Use StreamingDatagramReader(String, int) instead
+     */
+    @Deprecated
+    public StreamingDatagramReader(String filePath, int batchSize, boolean unused) throws IOException {
+        this(filePath, batchSize);
+    }
+    
+    /**
+     * Lee el siguiente lote de datagramas
      */
     public BusDatagram[] readNextBatch() throws IOException {
         List<BusDatagram> batch = new ArrayList<>(batchSize);
         
-        // Saltar header en primera lectura
+        // Saltar header
         if (!headerSkipped) {
             reader.readLine();
             headerSkipped = true;
@@ -55,7 +65,6 @@ public class StreamingDatagramReader implements AutoCloseable {
             }
             totalRead++;
             
-            // Progreso cada 100K líneas
             if (totalRead % 100000 == 0) {
                 System.out.println("  Leídas " + totalRead + " líneas...");
             }
@@ -65,67 +74,122 @@ public class StreamingDatagramReader implements AutoCloseable {
     }
     
     /**
-     * Cuenta el total de líneas sin cargar datos (para planificación)
+     * PARSEAR DATAGRAMAS CON EL FORMATO REAL
+     * 
+     * Campos del CSV:
+     * 0: eventType
+     * 1: registerdate (no usado)
+     * 2: stopId
+     * 3: odometer (METROS - distancia acumulada)
+     * 4: latitude (DIVIDIR por 10,000,000)
+     * 5: longitude (DIVIDIR por 10,000,000)
+     * 6: taskId (no usado)
+     * 7: lineId
+     * 8: tripId
+     * 9: unknown1 (no usado)
+     * 10: datagramDate (timestamp formato: "2019-05-27 20:14:43")
+     * 11: busId
      */
+    private BusDatagram parseDatagram(String line) {
+        try {
+            // Limpiar comillas si existen
+            line = line.replace("\"", "");
+            
+            String[] parts = line.split(",");
+            if (parts.length < 12) {
+                return null; // Línea incompleta
+            }
+            
+            BusDatagram dgram = new BusDatagram();
+            
+            // Campos básicos
+            dgram.eventType = parseInt(parts[0], 0);
+            dgram.stopId = parts[2].trim();
+            dgram.lineId = parts[7].trim();
+            dgram.tripId = parts[8].trim();
+            dgram.busId = parts[11].trim();
+            
+            // ODÓMETRO (ya está en metros)
+            dgram.odometer = parseDouble(parts[3], 0.0);
+            
+            // COORDENADAS (dividir por 10,000,000 para obtener grados decimales)
+            double rawLat = parseDouble(parts[4], 0.0);
+            double rawLon = parseDouble(parts[5], 0.0);
+            
+            dgram.latitude = rawLat / 10000000.0;
+            dgram.longitude = rawLon / 10000000.0;
+            
+            // TIMESTAMP (formato: "2019-05-27 20:14:43")
+            dgram.datagramDate = parts[10].trim();
+            
+            // Validar datos básicos
+            if (!isValidDatagram(dgram)) {
+                return null;
+            }
+            
+            return dgram;
+            
+        } catch (Exception e) {
+            // Ignorar líneas con errores
+            return null;
+        }
+    }
+    
+    /**
+     * Valida que el datagrama tenga datos mínimos correctos
+     */
+    private boolean isValidDatagram(BusDatagram dgram) {
+        // Verificar campos obligatorios no vacíos
+        if (dgram.stopId.isEmpty() || dgram.lineId.isEmpty() || 
+            dgram.tripId.isEmpty() || dgram.busId.isEmpty() ||
+            dgram.datagramDate.isEmpty()) {
+            return false;
+        }
+        
+        // Verificar coordenadas en rango de Cali (Colombia)
+        // Cali: ~3.3-3.5°N, ~76.4-76.6°W
+        if (dgram.latitude < 3.0 || dgram.latitude > 4.0 ||
+            dgram.longitude > -76.0 || dgram.longitude < -77.0) {
+            return false;
+        }
+        
+        // Verificar odómetro positivo
+        if (dgram.odometer < 0) {
+            return false;
+        }
+        
+        // Verificar formato de timestamp (básico)
+        if (!dgram.datagramDate.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    private int parseInt(String value, int defaultValue) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+    
+    private double parseDouble(String value, double defaultValue) {
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+    
     public static long countLines(String filePath) throws IOException {
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath))) {
             return reader.lines().count() - 1; // -1 por el header
         }
     }
     
-    /**
-     * Estima el tamaño del archivo en bytes
-     */
     public static long getFileSize(String filePath) throws IOException {
         return Files.size(Paths.get(filePath));
-    }
-    
-// En StreamingDatagramReader.java, modificar el método parseDatagram:
-private BusDatagram parseDatagram(String line) {
-    try {
-        String[] parts = line.split(",");
-        if (parts.length < 11) return null;
-        
-        BusDatagram rawDatagram = new BusDatagram();
-        rawDatagram.eventType = Integer.parseInt(parts[0].trim());
-        rawDatagram.stopId = parts[2].trim();
-        rawDatagram.odometer = parseDouble(parts[3].trim());
-        rawDatagram.latitude = parseCoordinate(parts[4].trim());
-        rawDatagram.longitude = parseCoordinate(parts[5].trim());
-        rawDatagram.lineId = parts[6].trim();
-        rawDatagram.tripId = parts[7].trim();
-        rawDatagram.datagramDate = parts[9].trim();
-        rawDatagram.busId = parts[10].trim();
-        
-        // LIMPIAR el datagrama
-        BusDatagram cleanedDatagram = DataCleaner.cleanDatagram(rawDatagram);
-        
-        // Solo devolver si es válido para cálculo de velocidades
-        if (DataCleaner.isValidForVelocityCalculation(cleanedDatagram)) {
-            return cleanedDatagram;
-        }
-        
-        return null;
-        
-    } catch (Exception e) {
-        return null;
-    }
-}
-    
-    private double parseCoordinate(String coord) {
-        try {
-            return Double.parseDouble(coord.trim());
-        } catch (NumberFormatException e) {
-            return 0.0;
-        }
-    }
-    
-    private double parseDouble(String value) {
-        try {
-            return Double.parseDouble(value.trim());
-        } catch (NumberFormatException e) {
-            return 0.0;
-        }
     }
     
     public long getTotalRead() {

@@ -2,6 +2,7 @@ package com.sitm.mio.worker;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,8 +18,9 @@ import SITM.MIO._WorkerDisp;
 
 public class VelocityWorker extends _WorkerDisp {
     private final String workerId;
-    private static final DateTimeFormatter DATE_FORMATTER = 
-        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    // FORMATO DE FECHA REAL: "2019-05-27 20:14:43"
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public VelocityWorker(String workerId) {
         this.workerId = workerId;
@@ -27,95 +29,34 @@ public class VelocityWorker extends _WorkerDisp {
 
     @Override
     public VelocityResult processTask(ProcessingTask task, Current current) {
-        System.out.println("Worker " + workerId + " processing task " + task.taskId + 
-                         " with " + task.datagrams.length + " datagrams");
-        
+        System.out.println("Worker " + workerId + " processing task " + task.taskId +
+                " with " + task.datagrams.length + " datagrams");
+
         long startTime = System.currentTimeMillis();
-        
+
         try {
+            // Agrupar datagramas por viaje (trip)
             Map<String, List<BusDatagram>> tripDatagrams = groupDatagramsByTrip(task.datagrams);
-            Map<String, List<Double>> arcVelocities = calculateArcVelocities(tripDatagrams, task.arcs);
+
+            // Calcular velocidades por arco usando ODÓMETRO
+            Map<String, List<Double>> arcVelocities = calculateArcVelocitiesWithOdometer(tripDatagrams);
 
             // Persistir a DB si está disponible
-            try {
-                if (com.sitm.mio.persistence.DBConnection.isAvailable()) {
-                    com.sitm.mio.persistence.VelocityDao dao = new com.sitm.mio.persistence.VelocityDao();
-                    String ym = com.sitm.mio.persistence.VelocityDao.currentYearMonth();
-                    
-                    for (Map.Entry<String, List<Double>> e : arcVelocities.entrySet()) {
-                        String arcId = e.getKey();
-                        List<Double> vals = e.getValue();
-                        long samples = vals.size();
-                        double avg = 0.0;
-                        if (samples > 0) {
-                            double sum = 0.0;
-                            for (Double v : vals) sum += v;
-                            avg = sum / samples;
-                        }
-                        
-                        String lineId = extractLineIdFromArc(arcId);
-                        dao.upsert(ym, lineId, arcId, avg, samples);
-                    }
-                    System.out.println("Worker " + workerId + " - Results persisted to database");
-                } else {
-                    System.out.println("Worker " + workerId + " - DB not available, results computed in-memory only");
-                }
-            } catch (Exception ex) {
-                System.err.println("Worker DB persist error (non-critical): " + ex.getMessage());
-            }
+            persistToDatabase(arcVelocities);
 
-            // CRÍTICO: Retornar UN resultado agregado que contiene la info de todos los arcos
-            // El master luego expandirá esto en resultados individuales
-            VelocityResult aggregatedResult = new VelocityResult();
-            aggregatedResult.arcId = "aggregated-" + task.taskId;
-            aggregatedResult.processingTime = System.currentTimeMillis() - startTime;
-            
-            // Serializar los datos de velocidad en periodStart (hack temporal)
-            // Formato: "arcId1:velocity1:samples1|arcId2:velocity2:samples2|..."
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, List<Double>> entry : arcVelocities.entrySet()) {
-                String arcId = entry.getKey();
-                List<Double> velocities = entry.getValue();
-                
-                if (velocities.size() > 0) {
-                    double sum = 0.0;
-                    for (Double v : velocities) sum += v;
-                    double avg = sum / velocities.size();
-                    
-                    if (sb.length() > 0) sb.append("|");
-                    sb.append(arcId).append(":").append(avg).append(":").append(velocities.size());
-                }
-            }
-            
-            aggregatedResult.periodStart = sb.toString();
-            aggregatedResult.sampleCount = arcVelocities.values().stream()
-                .mapToInt(List::size).sum();
-            
-            // Calcular velocidad promedio global
-            double totalVelocity = 0.0;
-            int totalSamples = 0;
-            for (List<Double> velocities : arcVelocities.values()) {
-                for (Double v : velocities) {
-                    totalVelocity += v;
-                    totalSamples++;
-                }
-            }
-            aggregatedResult.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
+            // Retornar resultado agregado
+            VelocityResult aggregatedResult = buildAggregatedResult(
+                    task.taskId, arcVelocities, startTime);
 
-            System.out.println("Worker " + workerId + " completed: " + arcVelocities.size() + 
-                             " arcs, " + totalSamples + " samples");
+            System.out.println("Worker " + workerId + " completed: " +
+                    arcVelocities.size() + " arcs processed");
 
             return aggregatedResult;
-            
+
         } catch (Exception e) {
             System.err.println("Error in worker " + workerId + ": " + e.getMessage());
             e.printStackTrace();
-            VelocityResult errorResult = new VelocityResult();
-            errorResult.arcId = "error-" + task.taskId;
-            errorResult.averageVelocity = 0.0;
-            errorResult.sampleCount = 0;
-            errorResult.processingTime = System.currentTimeMillis() - startTime;
-            return errorResult;
+            return createErrorResult(task.taskId, startTime);
         }
     }
 
@@ -123,40 +64,15 @@ public class VelocityWorker extends _WorkerDisp {
     public VelocityResult processStreamingWindow(StreamingWindow window, Current current) {
         System.out.println("Worker " + workerId + " processing streaming window " + window.windowId);
         long startTime = System.currentTimeMillis();
-        
+
         try {
-            ProcessingTask task = new ProcessingTask();
-            task.taskId = window.windowId;
-            task.datagrams = window.datagrams;
-            
             Map<String, List<BusDatagram>> tripDatagrams = groupDatagramsByTrip(window.datagrams);
-            Map<String, List<Double>> arcVelocities = calculateArcVelocities(tripDatagrams, new Arc[0]);
-            
-            VelocityResult result = new VelocityResult();
-            result.arcId = "streaming-" + window.windowId;
-            result.processingTime = System.currentTimeMillis() - startTime;
-            
-            double totalVelocity = 0.0;
-            int totalSamples = 0;
-            for (List<Double> velocities : arcVelocities.values()) {
-                for (Double v : velocities) {
-                    totalVelocity += v;
-                    totalSamples++;
-                }
-            }
-            
-            result.sampleCount = totalSamples;
-            result.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
-            
-            return result;
+            Map<String, List<Double>> arcVelocities = calculateArcVelocitiesWithOdometer(tripDatagrams);
+
+            return buildAggregatedResult(window.windowId, arcVelocities, startTime);
         } catch (Exception e) {
             System.err.println("Error in streaming worker " + workerId + ": " + e.getMessage());
-            VelocityResult errorResult = new VelocityResult();
-            errorResult.arcId = "error-streaming-" + window.windowId;
-            errorResult.averageVelocity = 0.0;
-            errorResult.sampleCount = 0;
-            errorResult.processingTime = System.currentTimeMillis() - startTime;
-            return errorResult;
+            return createErrorResult("streaming-" + window.windowId, startTime);
         }
     }
 
@@ -165,14 +81,20 @@ public class VelocityWorker extends _WorkerDisp {
         return true;
     }
 
+    /**
+     * Agrupa datagramas por viaje único (busId + tripId + lineId)
+     * y los ordena cronológicamente por datagramDate
+     */
     private Map<String, List<BusDatagram>> groupDatagramsByTrip(BusDatagram[] datagrams) {
         Map<String, List<BusDatagram>> grouped = new HashMap<>();
-        
+
         for (BusDatagram dgram : datagrams) {
+            // Clave única por viaje
             String tripKey = dgram.busId + "-" + dgram.tripId + "-" + dgram.lineId;
             grouped.computeIfAbsent(tripKey, k -> new ArrayList<>()).add(dgram);
         }
-        
+
+        // Ordenar cada viaje por timestamp
         for (List<BusDatagram> tripData : grouped.values()) {
             tripData.sort((d1, d2) -> {
                 try {
@@ -184,111 +106,219 @@ public class VelocityWorker extends _WorkerDisp {
                 }
             });
         }
-        
+
         return grouped;
     }
 
-    private Map<String, List<Double>> calculateArcVelocities(
-            Map<String, List<BusDatagram>> tripDatagrams, Arc[] arcs) {
-        
+    /**
+     * CÁLCULO DE VELOCIDAD USANDO ODÓMETRO REAL
+     * 
+     * Fórmula: velocidad = (odometer2 - odometer1) / (tiempo2 - tiempo1)
+     * 
+     * Donde:
+     * - odometer está en METROS (distancia acumulada del bus)
+     * - tiempo en SEGUNDOS (diferencia entre datagramDate)
+     */
+    private Map<String, List<Double>> calculateArcVelocitiesWithOdometer(
+            Map<String, List<BusDatagram>> tripDatagrams) {
+
         Map<String, List<Double>> velocitiesByArc = new HashMap<>();
-        
+
         for (List<BusDatagram> tripData : tripDatagrams.values()) {
-            if (tripData.size() < 2) continue;
-            
+            if (tripData.size() < 2)
+                continue;
+
+            // Procesar cada par consecutivo de datagramas en el viaje
             for (int i = 0; i < tripData.size() - 1; i++) {
                 BusDatagram d1 = tripData.get(i);
                 BusDatagram d2 = tripData.get(i + 1);
-                
-                // Intentar encontrar el arco correspondiente
-                Arc arc = findArcForDatagrams(d1, d2, arcs);
-                
-                if (arc != null && arc.distance > 0) {
-                    double velocity = calculateVelocity(d1, d2, arc.distance);
-                    if (velocity > 0 && velocity < 50) { // Filtro de velocidades razonables
-                        velocitiesByArc.computeIfAbsent(arc.arcId, k -> new ArrayList<>()).add(velocity);
+
+                try {
+                    // CALCULAR VELOCIDAD CON ODÓMETRO
+                    double velocity = calculateVelocityUsingOdometer(d1, d2);
+
+                    if (velocity > 0 && velocity < 50) { // Filtro: 0-50 m/s (~0-180 km/h)
+                        // Crear arcId basado en la secuencia de paradas
+                        String arcId = createArcId(d1, d2);
+                        velocitiesByArc.computeIfAbsent(arcId, k -> new ArrayList<>()).add(velocity);
                     }
-                } else {
-                    // Si no hay arco definido, crear un arcId basado en los stops
-                    String syntheticArcId = createSyntheticArcId(d1, d2);
-                    double distance = calculateDistanceFromCoordinates(d1, d2);
-                    
-                    if (distance > 0) {
-                        double velocity = calculateVelocity(d1, d2, distance);
-                        if (velocity > 0 && velocity < 50) {
-                            velocitiesByArc.computeIfAbsent(syntheticArcId, k -> new ArrayList<>()).add(velocity);
-                        }
-                    }
+
+                } catch (Exception e) {
+                    // Ignorar pares con errores en timestamps o odómetro
+                    continue;
                 }
             }
         }
-        
+
         return velocitiesByArc;
     }
 
-    private Arc findArcForDatagrams(BusDatagram d1, BusDatagram d2, Arc[] arcs) {
-        for (Arc arc : arcs) {
-            if (arc.lineId.equals(d1.lineId)) {
-                if (d1.stopId.equals(arc.startStopId) && d2.stopId.equals(arc.endStopId)) {
-                    return arc;
-                }
-            }
+    /**
+     * MÉTODO CLAVE: Calcular velocidad usando odómetro
+     * 
+     * @param d1 Datagrama inicial
+     * @param d2 Datagrama final
+     * @return Velocidad en m/s
+     */
+    private double calculateVelocityUsingOdometer(BusDatagram d1, BusDatagram d2)
+            throws Exception {
+
+        // 1. CALCULAR DISTANCIA usando odómetro (en metros)
+        double distance = d2.odometer - d1.odometer;
+
+        // Validar que el odómetro aumentó (no retrocedió)
+        if (distance <= 0) {
+            throw new Exception("Invalid odometer: distance <= 0");
         }
-        return null;
+
+        // 2. CALCULAR TIEMPO en segundos
+        LocalDateTime time1 = LocalDateTime.parse(d1.datagramDate, DATE_FORMATTER);
+        LocalDateTime time2 = LocalDateTime.parse(d2.datagramDate, DATE_FORMATTER);
+
+        long timeDiffSeconds = ChronoUnit.SECONDS.between(time1, time2);
+
+        // Validar que el tiempo avanzó
+        if (timeDiffSeconds <= 0) {
+            throw new Exception("Invalid time: timeDiff <= 0");
+        }
+
+        // 3. VELOCIDAD = DISTANCIA / TIEMPO
+        double velocity = distance / timeDiffSeconds;
+
+        // DEBUG (opcional - comentar en producción)
+        if (Math.random() < 0.001) { // Log 0.1% de muestras
+            System.out.printf("DEBUG: d=%.2fm, t=%ds, v=%.2fm/s (%.1fkm/h)%n",
+                    distance, timeDiffSeconds, velocity, velocity * 3.6);
+        }
+
+        return velocity;
     }
 
-    private String createSyntheticArcId(BusDatagram d1, BusDatagram d2) {
-        // Crear un ID sintético basado en line, stops y secuencia
+    /**
+     * Crea un ID de arco basado en las paradas consecutivas
+     * Formato: ARC_{lineId}_{stopId1}_{stopId2}
+     */
+    private String createArcId(BusDatagram d1, BusDatagram d2) {
         return String.format("ARC_%s_%s_%s", d1.lineId, d1.stopId, d2.stopId);
     }
 
-    private double calculateDistanceFromCoordinates(BusDatagram d1, BusDatagram d2) {
-        // Fórmula de Haversine para calcular distancia entre coordenadas
-        final int R = 6371000; // Radio de la Tierra en metros
-        
-        double lat1 = Math.toRadians(d1.latitude);
-        double lat2 = Math.toRadians(d2.latitude);
-        double dLat = Math.toRadians(d2.latitude - d1.latitude);
-        double dLon = Math.toRadians(d2.longitude - d1.longitude);
-        
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                 + Math.cos(lat1) * Math.cos(lat2)
-                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        
-        return R * c;
-    }
-
-    private double calculateVelocity(BusDatagram d1, BusDatagram d2, double arcDistance) {
+    /**
+     * Persistir resultados a base de datos (si está disponible)
+     */
+    private void persistToDatabase(Map<String, List<Double>> arcVelocities) {
         try {
-            LocalDateTime time1 = LocalDateTime.parse(d1.datagramDate, DATE_FORMATTER);
-            LocalDateTime time2 = LocalDateTime.parse(d2.datagramDate, DATE_FORMATTER);
-            
-            long timeDiff = java.time.Duration.between(time1, time2).getSeconds();
-            if (timeDiff <= 0) return 0.0;
-            
-            double distance;
-            if (d1.odometer > 0 && d2.odometer > 0 && d2.odometer > d1.odometer) {
-                distance = d2.odometer - d1.odometer;
-            } else {
-                distance = arcDistance;
+            if (!com.sitm.mio.persistence.DBConnection.isAvailable()) {
+                return; // DB no disponible - solo procesamiento en memoria
             }
-            
-            return distance / timeDiff;
-            
-        } catch (Exception e) {
-            return 0.0;
+
+            com.sitm.mio.persistence.VelocityDao dao = new com.sitm.mio.persistence.VelocityDao();
+            String yearMonth = com.sitm.mio.persistence.VelocityDao.currentYearMonth();
+
+            for (Map.Entry<String, List<Double>> entry : arcVelocities.entrySet()) {
+                String arcId = entry.getKey();
+                List<Double> velocities = entry.getValue();
+
+                if (velocities.isEmpty())
+                    continue;
+
+                // Calcular promedio
+                double sum = 0.0;
+                for (Double v : velocities)
+                    sum += v;
+                double avg = sum / velocities.size();
+
+                // Extraer lineId del arcId
+                String lineId = extractLineIdFromArc(arcId);
+
+                // Guardar en DB
+                dao.upsert(yearMonth, lineId, arcId, avg, velocities.size());
+            }
+
+            System.out.println("Worker " + workerId + " - Results persisted to database");
+
+        } catch (Exception ex) {
+            System.err.println("Worker DB persist error (non-critical): " + ex.getMessage());
         }
     }
 
+    /**
+     * Construye el resultado agregado para retornar al Master
+     */
+    private VelocityResult buildAggregatedResult(
+            String taskId,
+            Map<String, List<Double>> arcVelocities,
+            long startTime) {
+
+        VelocityResult result = new VelocityResult();
+        result.arcId = "aggregated-" + taskId;
+        result.processingTime = System.currentTimeMillis() - startTime;
+
+        // Serializar velocidades en periodStart
+        // Formato: "arcId1:velocity1:samples1|arcId2:velocity2:samples2|..."
+        StringBuilder sb = new StringBuilder();
+
+        for (Map.Entry<String, List<Double>> entry : arcVelocities.entrySet()) {
+            String arcId = entry.getKey();
+            List<Double> velocities = entry.getValue();
+
+            if (velocities.isEmpty())
+                continue;
+
+            double sum = 0.0;
+            for (Double v : velocities)
+                sum += v;
+            double avg = sum / velocities.size();
+
+            if (sb.length() > 0)
+                sb.append("|");
+            sb.append(arcId).append(":").append(avg).append(":").append(velocities.size());
+        }
+
+        result.periodStart = sb.toString();
+
+        // Calcular totales
+        int totalSamples = 0;
+        double totalVelocity = 0.0;
+
+        for (List<Double> velocities : arcVelocities.values()) {
+            for (Double v : velocities) {
+                totalVelocity += v;
+                totalSamples++;
+            }
+        }
+
+        result.sampleCount = totalSamples;
+        result.averageVelocity = totalSamples > 0 ? totalVelocity / totalSamples : 0.0;
+
+        return result;
+    }
+
+    /**
+     * Crea un resultado de error
+     */
+    private VelocityResult createErrorResult(String taskId, long startTime) {
+        VelocityResult errorResult = new VelocityResult();
+        errorResult.arcId = "error-" + taskId;
+        errorResult.averageVelocity = 0.0;
+        errorResult.sampleCount = 0;
+        errorResult.processingTime = System.currentTimeMillis() - startTime;
+        errorResult.periodStart = "";
+        errorResult.periodEnd = "";
+        return errorResult;
+    }
+
+    /**
+     * Extrae el lineId del arcId
+     */
     private String extractLineIdFromArc(String arcId) {
         try {
             if (arcId != null && arcId.contains("_")) {
                 String[] parts = arcId.split("_");
-                if (parts.length >= 2) return parts[1];
+                if (parts.length >= 2)
+                    return parts[1];
             }
-        } catch (Exception ex) {}
+        } catch (Exception ex) {
+        }
         return "unknown";
     }
 }

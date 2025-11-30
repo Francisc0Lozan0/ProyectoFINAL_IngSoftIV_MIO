@@ -14,8 +14,15 @@ import SITM.MIO.Arc;
 import SITM.MIO.BusDatagram;
 import SITM.MIO.Stop;
 
+/**
+ * Cargador de datos CSV en FORMATO REAL de SITM-MIO
+ */
 public class CSVDataLoader {
     
+    /**
+     * Cargar datagramas del CSV REAL
+     * Formato: eventType,date,stopId,odometer,lat,lon,taskId,lineId,tripId,unknown,timestamp,busId
+     */
     public static BusDatagram[] loadDatagrams(String filePath, int limit) throws IOException {
         List<BusDatagram> datagrams = new ArrayList<>();
         int count = 0;
@@ -46,38 +53,64 @@ public class CSVDataLoader {
         return datagrams.toArray(new BusDatagram[0]);
     }
 
+    /**
+     * PARSEAR DATAGRAMA CON FORMATO REAL
+     * 
+     * Columnas:
+     * 0: eventType
+     * 1: registerdate
+     * 2: stopId
+     * 3: odometer (metros)
+     * 4: latitude (dividir por 10,000,000)
+     * 5: longitude (dividir por 10,000,000)
+     * 6: taskId
+     * 7: lineId
+     * 8: tripId
+     * 9: unknown1
+     * 10: datagramDate ("2019-05-27 20:14:43")
+     * 11: busId
+     */
     private static BusDatagram parseDatagram(String line) {
         try {
+            line = line.replace("\"", "");
             String[] parts = line.split(",");
-            if (parts.length < 11) return null;
+            if (parts.length < 12) return null;
             
             BusDatagram dgram = new BusDatagram();
             dgram.eventType = Integer.parseInt(parts[0].trim());
             dgram.stopId = parts[2].trim();
-            dgram.odometer = Double.parseDouble(parts[3].trim());
-            dgram.latitude = parseCoordinate(parts[4].trim());
-            dgram.longitude = parseCoordinate(parts[5].trim());
-            dgram.lineId = parts[6].trim();   
-            dgram.tripId = parts[7].trim();    
-            dgram.datagramDate = parts[9].trim(); 
-            dgram.busId = parts[10].trim();    
+            dgram.odometer = parseDouble(parts[3].trim());
+            dgram.latitude = parseDouble(parts[4].trim()) / 10000000.0;
+            dgram.longitude = parseDouble(parts[5].trim()) / 10000000.0;
+            dgram.lineId = parts[7].trim();
+            dgram.tripId = parts[8].trim();
+            dgram.datagramDate = parts[10].trim();
+            dgram.busId = parts[11].trim();
+            
+            // Validar coordenadas de Cali
+            if (dgram.latitude < 3.0 || dgram.latitude > 4.0 ||
+                dgram.longitude > -76.0 || dgram.longitude < -77.0) {
+                return null;
+            }
             
             return dgram;
         } catch (Exception e) {
-            System.err.println("Error parsing datagram: " + line);
             return null;
         }
     }
 
-    private static double parseCoordinate(String coord) {
+    private static double parseDouble(String value) {
         try {
-            return Double.parseDouble(coord.trim());
+            return Double.parseDouble(value.trim());
         } catch (NumberFormatException e) {
-            System.err.println("Error parsing coordinate: " + coord);
             return 0.0;
         }
     }
 
+    /**
+     * Cargar paradas
+     * Formato: LONGNAME,GPS_X,GPS_Y,STOPID,PLANVERSIONID,SHORTNAME,DECIMALLONG,DECIMALLAT
+     */
     public static Stop[] loadStops(String filePath) throws IOException {
         List<Stop> stops = new ArrayList<>();
         
@@ -102,6 +135,10 @@ public class CSVDataLoader {
         return stops.toArray(new Stop[0]);
     }
 
+    /**
+     * PARSEAR STOP
+     * Columnas: LONGNAME,GPS_X,GPS_Y,STOPID,PLANVERSIONID,SHORTNAME,DECIMALLONG,DECIMALLAT
+     */
     private static Stop parseStop(String line) {
         try {
             String cleaned = line.replaceAll("\"", "");
@@ -110,19 +147,22 @@ public class CSVDataLoader {
             if (parts.length < 8) return null;
             
             Stop stop = new Stop();
-            stop.stopId = parts[0].trim();
-            stop.shortName = parts[2].trim();
-            stop.longName = parts[3].trim();
-            stop.longitude = Double.parseDouble(parts[7].trim());
-            stop.latitude = Double.parseDouble(parts[6].trim());
+            stop.stopId = parts[3].trim();        // STOPID
+            stop.shortName = parts[5].trim();     // SHORTNAME
+            stop.longName = parts[0].trim();      // LONGNAME
+            stop.longitude = Double.parseDouble(parts[6].trim()); // DECIMALLONG
+            stop.latitude = Double.parseDouble(parts[7].trim());  // DECIMALLAT
             
             return stop;
         } catch (Exception e) {
-            System.err.println("Error parsing stop: " + line);
             return null;
         }
     }
 
+    /**
+     * Cargar LineStops
+     * Formato: LINESTOPID,STOPSEQUENCE,ORIENTATION,LINEID,STOPID,PLANVERSIONID,LINEVARIANT,LINEVARIANTTYPE
+     */
     public static SITM.MIO.LineStop[] loadLineStops(String filePath) throws IOException {
         List<SITM.MIO.LineStop> lineStops = new ArrayList<>();
         
@@ -147,34 +187,36 @@ public class CSVDataLoader {
         return lineStops.toArray(new SITM.MIO.LineStop[0]);
     }
 
+    /**
+     * PARSEAR LINESTOP
+     * Columnas: LINESTOPID,STOPSEQUENCE,ORIENTATION,LINEID,STOPID,PLANVERSIONID,LINEVARIANT,LINEVARIANTTYPE
+     */
     private static SITM.MIO.LineStop parseLineStop(String line) {
         try {
             String cleaned = line.replaceAll("\"", "");
             String[] parts = cleaned.split(",");
             
-            if (parts.length < 6) return null;
+            if (parts.length < 5) return null;
             
             SITM.MIO.LineStop lineStop = new SITM.MIO.LineStop();
-            lineStop.lineId = parts[3].trim();
-            lineStop.stopId = parts[4].trim();
-            lineStop.stopSequence = Integer.parseInt(parts[1].trim());
+            lineStop.stopSequence = Integer.parseInt(parts[1].trim()); // STOPSEQUENCE
+            lineStop.lineId = parts[3].trim();                         // LINEID
+            lineStop.stopId = parts[4].trim();                         // STOPID
             
             return lineStop;
         } catch (Exception e) {
-            System.err.println("Error parsing line stop: " + line);
             return null;
         }
     }
 
+    /**
+     * Construir arcos desde LineStops
+     */
     public static Arc[] buildArcs(SITM.MIO.LineStop[] lineStops, Stop[] stops) {
-        // Agrupar por línea Y orientación
         Map<String, Map<Integer, List<SITM.MIO.LineStop>>> stopsByLineAndOrientation = new HashMap<>();
         List<Arc> arcs = new ArrayList<>();
         
-        // Primero necesitamos cargar la orientación desde linestops.csv
-        // Vamos a asumir orientación 0 (IDA) por defecto
-        // Para una implementación completa, deberías cargar la columna ORIENTATION del CSV
-        
+        // Leer orientación desde linestops.csv
         try (BufferedReader br = Files.newBufferedReader(Paths.get("./data/linestops.csv"))) {
             String line;
             boolean firstLine = true;
@@ -186,10 +228,10 @@ public class CSVDataLoader {
                 }
                 
                 String[] parts = line.split(",");
-                if (parts.length < 6) continue;
+                if (parts.length < 5) continue;
                 
                 int sequence = Integer.parseInt(parts[1].trim());
-                int orientation = Integer.parseInt(parts[2].trim()); // CRITICAL: Leer la orientación
+                int orientation = Integer.parseInt(parts[2].trim());
                 String lineId = parts[3].trim();
                 String stopId = parts[4].trim();
                 
@@ -207,7 +249,7 @@ public class CSVDataLoader {
             System.err.println("Error loading orientations: " + e.getMessage());
         }
         
-        // Construir arcos con orientación incluida
+        // Construir arcos
         for (Map.Entry<String, Map<Integer, List<SITM.MIO.LineStop>>> lineEntry : stopsByLineAndOrientation.entrySet()) {
             String lineId = lineEntry.getKey();
             
@@ -221,7 +263,6 @@ public class CSVDataLoader {
                     SITM.MIO.LineStop end = lineStopList.get(i+1);
                     
                     Arc arc = new Arc();
-                    // CRITICAL: Incluir orientación en el arcId
                     String orientStr = orientation == 0 ? "IDA" : "VTA";
                     arc.arcId = String.format("ARC_%s_%s_%d_%d", 
                         lineId, orientStr, start.stopSequence, end.stopSequence);
@@ -245,14 +286,6 @@ public class CSVDataLoader {
         }
         
         System.out.println("Total arcs built: " + arcs.size());
-        
-        // DEBUG: Imprimir algunos arcos
-        System.out.println("Sample arcs created:");
-        for (int i = 0; i < Math.min(5, arcs.size()); i++) {
-            Arc arc = arcs.get(i);
-            System.out.println("  " + arc.arcId + " (" + arc.startStopId + " -> " + arc.endStopId + ")");
-        }
-        
         return arcs.toArray(new Arc[0]);
     }
 

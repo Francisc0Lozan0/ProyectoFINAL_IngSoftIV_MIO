@@ -1,2 +1,0 @@
-test_label,timestamp,datagram_count,processing_time_ms,batch_count,workers,throughput_dps,throughput_dpm
-1_MILLÓN,2025-11-30T04:30:46.9699159,781,859,1,272,607,782,1,614.38,36862.55

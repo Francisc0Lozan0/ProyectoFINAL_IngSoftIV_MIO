@@ -7,6 +7,7 @@ import SITM.MIO.BusDatagram;
 public class DataCleaner {
     
     private static final Random random = new Random();
+    private static int cleanedCount = 0;
     
     // Coordenadas aproximadas del área de Cali
     private static final double CALI_MIN_LAT = 3.38;
@@ -14,7 +15,7 @@ public class DataCleaner {
     private static final double CALI_MIN_LON = -76.55;
     private static final double CALI_MAX_LON = -76.45;
     
-    // Líneas válidas del MIO (basado en lines.csv)
+    // Líneas válidas del MIO
     private static final String[] VALID_LINES = {
         "770", "917", "276", "3123", "3122", "A01", "A02", "A03", 
         "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", 
@@ -32,39 +33,46 @@ public class DataCleaner {
         cleaned.busId = original.busId;
         cleaned.tripId = original.tripId;
         
-        // CORREGIR coordenadas (dividir por 10,000,000 - parece ser el factor)
+        // CORREGIR coordenadas (YA normalizadas del Reader)
         cleaned.latitude = fixCoordinate(original.latitude);
         cleaned.longitude = fixCoordinate(original.longitude);
         
-        // CORREGIR stopId (-1 → valor aleatorio de parada válida)
+        // CORREGIR stopId 
+        String originalStopId = original.stopId;
         cleaned.stopId = fixStopId(original.stopId);
         
-        // CORREGIR lineId (-1 → línea válida aleatoria)
+        // CORREGIR lineId
+        String originalLineId = original.lineId;
         cleaned.lineId = fixLineId(original.lineId);
         
-        // CORREGIR fecha (timestamp corrupto → fecha sintética)
+        // CORREGIR fecha
         cleaned.datagramDate = fixDate(original.datagramDate);
+        
+        // DEBUG: Mostrar algunas correcciones
+        cleanedCount++;
+        if (cleanedCount <= 10) {
+            boolean stopIdChanged = !originalStopId.equals(cleaned.stopId);
+            boolean lineIdChanged = !originalLineId.equals(cleaned.lineId);
+            
+            if (stopIdChanged || lineIdChanged) {
+                System.out.printf("   🔧 Datagrama %d corregido: stop[%s→%s] line[%s→%s]%n",
+                    cleanedCount, originalStopId, cleaned.stopId, originalLineId, cleaned.lineId);
+            }
+        }
         
         return cleaned;
     }
     
     private static double fixCoordinate(double coord) {
-        // Si la coordenada es muy grande, probablemente está multiplicada
-        if (Math.abs(coord) > 1000000) {
-            return coord / 10000000.0; // División por 10^7
-        }
-        
-        // Si está en rango razonable, generar coordenada aleatoria en Cali
+        // Ya viene normalizada del Reader, solo verificar validez
         if (coord == 0 || Math.abs(coord) > 90) {
             return CALI_MIN_LAT + (random.nextDouble() * (CALI_MAX_LAT - CALI_MIN_LAT));
         }
-        
         return coord;
     }
     
     private static String fixStopId(String stopId) {
         if (stopId == null || stopId.equals("-1") || stopId.trim().isEmpty()) {
-            // Generar stopId sintético basado en stops reales
             return String.format("5%05d", 10000 + random.nextInt(2000));
         }
         return stopId.trim();
@@ -72,7 +80,6 @@ public class DataCleaner {
     
     private static String fixLineId(String lineId) {
         if (lineId == null || lineId.equals("-1") || lineId.trim().isEmpty()) {
-            // Usar línea válida aleatoria
             return VALID_LINES[random.nextInt(VALID_LINES.length)];
         }
         return lineId.trim();
@@ -84,31 +91,25 @@ public class DataCleaner {
         }
         
         try {
-            // Intentar interpretar como timestamp (parece ser el caso)
             long timestamp = Long.parseLong(dateStr.trim());
-            
-            // Si el timestamp es irrealmente grande, generar fecha sintética
-            if (timestamp > 253402300799L) { // Año 9999
+            if (timestamp > 253402300799L) {
                 return generateSyntheticDateTime();
             }
             
-            // Convertir timestamp a fecha legible
             java.util.Date date = new java.util.Date(timestamp);
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             return sdf.format(date);
             
         } catch (NumberFormatException e) {
-            // Si no es número, generar fecha sintética
             return generateSyntheticDateTime();
         }
     }
     
     private static String generateSyntheticDateTime() {
-        // Generar fecha/hora realista para el sistema MIO
         int year = 2024;
         int month = random.nextInt(12) + 1;
         int day = random.nextInt(28) + 1;
-        int hour = 6 + random.nextInt(14); // 6:00 - 20:00
+        int hour = 6 + random.nextInt(14);
         int minute = random.nextInt(60);
         int second = random.nextInt(60);
         
@@ -119,22 +120,22 @@ public class DataCleaner {
     public static boolean isValidForVelocityCalculation(BusDatagram dgram) {
         if (dgram == null) return false;
         
-        // Verificar coordenadas en rango de Cali
-        if (dgram.latitude < CALI_MIN_LAT || dgram.latitude > CALI_MAX_LAT ||
-            dgram.longitude < CALI_MIN_LON || dgram.longitude > CALI_MAX_LON) {
-            return false;
-        }
+        // Verificar coordenadas razonables para Cali
+        if (dgram.latitude < 3.0 || dgram.latitude > 4.0) return false;
+        if (dgram.longitude < -77.0 || dgram.longitude > -76.0) return false;
         
-        // Verificar que no tenga IDs inválidos
-        if (dgram.stopId.equals("-1") || dgram.lineId.equals("-1")) {
-            return false;
-        }
+        // Verificar IDs válidos
+        if (dgram.stopId == null || dgram.stopId.equals("-1") || dgram.stopId.isEmpty()) return false;
+        if (dgram.lineId == null || dgram.lineId.equals("-1") || dgram.lineId.isEmpty()) return false;
+        if (dgram.busId == null || dgram.busId.isEmpty()) return false;
         
-        // Verificar fecha válida
-        if (dgram.datagramDate == null || dgram.datagramDate.isEmpty()) {
-            return false;
-        }
+        // Verificar fecha
+        if (dgram.datagramDate == null || dgram.datagramDate.isEmpty()) return false;
         
         return true;
+    }
+    
+    public static void resetCounter() {
+        cleanedCount = 0;
     }
 }

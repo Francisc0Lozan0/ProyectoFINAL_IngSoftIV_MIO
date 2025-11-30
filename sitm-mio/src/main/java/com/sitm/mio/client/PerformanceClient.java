@@ -17,17 +17,17 @@ import SITM.MIO.MasterPrxHelper;
 import SITM.MIO.VelocityResult;
 
 /**
- * Cliente ULTRA-ESTABLE - Prioriza completar el procesamiento sobre velocidad
- * CON PERSISTENCIA DE DATOS
+ * Cliente ULTRA-ESTABLE para procesamiento de datos reales SITM-MIO
+ * FORMATO REAL DE CSV con odómetro
  */
 public class PerformanceClient {
     private Communicator communicator;
     private MasterPrx master;
 
     public void initialize(String[] args) {
-        // CONFIGURACIÓN ICE MUCHO MÁS CONSERVADORA
+        // Configuración ICE conservadora
         String[] iceArgs = new String[] {
-            "--Ice.MessageSizeMax=20971520",   // 20MB - suficiente para batches pequeños
+            "--Ice.MessageSizeMax=20971520",   // 20MB
             "--Ice.ACM.Timeout=1200",          // 20 minutos
             "--Ice.TCP.RcvSize=65536",         // 64KB
             "--Ice.TCP.SndSize=65536"          // 64KB
@@ -48,37 +48,35 @@ public class PerformanceClient {
         }
 
         System.out.println("✓ Conectado al Master - Modo ULTRA-ESTABLE activado");
-        System.out.println("✓ Batch Size: 1,000 datagramas - Priorizando ESTABILIDAD");
+        System.out.println("✓ Formato: CSV Real con ODÓMETRO");
         System.out.println("✓ Persistencia de datos ACTIVADA");
     }
 
     /**
-     * Procesa TODOS los archivos con batches MUY pequeños pero ESTABLES
+     * Procesa TODOS los archivos con batches estables
      */
     public void runUltraStableProcessing(String dataPath) {
-        System.out.println("SITM-MIO - MODO ULTRA-ESTABLE (Batches PEQUEÑOS)");
+        System.out.println("SITM-MIO - PROCESAMIENTO CON ODÓMETRO REAL");
         System.out.println("Directorio de datos: " + dataPath);
 
-        // TODOS LOS ARCHIVOS - desde 1,000 hasta 100 millones
+        // Archivos de prueba (ajustar según tus archivos reales)
         String[] testFiles = {
             dataPath + "/datagrams_1000.csv",
             dataPath + "/datagrams_10000.csv",
             dataPath + "/datagrams_100000.csv",
             dataPath + "/datagrams_1M.csv",
-            dataPath + "/datagrams_10M.csv", 
-            dataPath + "/datagrams_100M.csv"
+            dataPath + "/datagrams_10M.csv"
         };
 
         String[] fileLabels = { 
-            "1 MIL", 
-            "10 MIL", 
-            "100 MIL", 
-            "1 MILLÓN", 
-            "10 MILLONES", 
-            "100 MILLONES" 
+            "1_MIL", 
+            "10_MIL", 
+            "100_MIL", 
+            "1_MILLON", 
+            "10_MILLONES"
         };
 
-        System.out.println("\n🎯 PROCESANDO TODOS LOS ARCHIVOS CON BATCHES PEQUEÑOS:");
+        System.out.println("\n🎯 PROCESANDO ARCHIVOS CON ODÓMETRO:");
         for (int i = 0; i < testFiles.length; i++) {
             System.out.printf("  %d. %s → %s%n", i + 1, testFiles[i], fileLabels[i]);
         }
@@ -89,8 +87,8 @@ public class PerformanceClient {
             }
 
             System.out.println("\n" + "🎉".repeat(60));
-            System.out.println("✅ TODOS LOS ARCHIVOS PROCESADOS EXITOSAMENTE EN MODO ESTABLE");
-            System.out.println("📊 TODOS LOS DATOS GUARDADOS EN ARCHIVOS PERSISTENTES");
+            System.out.println("✅ TODOS LOS ARCHIVOS PROCESADOS EXITOSAMENTE");
+            System.out.println("📊 DATOS GUARDADOS EN ./results/");
             System.out.println("🎉".repeat(60));
 
         } catch (Exception e) {
@@ -101,7 +99,7 @@ public class PerformanceClient {
 
     private void processFileUltraStable(String filePath, String label, int fileIndex) {
         System.out.println("\n" + "=".repeat(100));
-        System.out.println("🐢 PROCESANDO EN MODO ULTRA-ESTABLE: " + label);
+        System.out.println("🐢 PROCESANDO: " + label);
         System.out.println("📁 Archivo: " + filePath);
         System.out.println("💾 Persistencia: ACTIVADA");
         System.out.println("=".repeat(100));
@@ -111,7 +109,7 @@ public class PerformanceClient {
             return;
         }
 
-        int maxRetries = 2; // Menos reintentos, más pausas
+        int maxRetries = 2;
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 System.out.printf("🔄 Intento %d/%d para %s%n", attempt, maxRetries, label);
@@ -123,14 +121,13 @@ public class PerformanceClient {
                 }
 
                 processFileWithTinyBatches(filePath, label, fileIndex);
-                System.out.printf("✅ %s COMPLETADO en modo estable%n", label);
+                System.out.printf("✅ %s COMPLETADO%n", label);
                 break;
                 
             } catch (Exception e) {
                 System.err.printf("❌ Intento %d falló: %s%n", attempt, e.getMessage());
                 if (attempt == maxRetries) {
-                    System.err.printf("💥 No se pudo procesar %s después de %d intentos%n", label, maxRetries);
-                    // Continuar con el siguiente archivo en lugar de fallar completamente
+                    System.err.printf("💥 No se pudo procesar %s%n", label);
                     return;
                 }
             }
@@ -139,26 +136,24 @@ public class PerformanceClient {
 
     private void processFileWithTinyBatches(String filePath, String label, int fileIndex) {
         try {
-            // BATCH SIZE MUY PEQUEÑO - CRÍTICO PARA ESTABILIDAD
-            int batchSize = 1000; // SOLO 1,000 datagramas por lote
+            int batchSize = 1000; // Batch pequeño y estable
             
             long fileSize = StreamingDatagramReader.getFileSize(filePath);
             long estimatedLines = StreamingDatagramReader.countLines(filePath);
 
-            System.out.printf("📊 CONFIGURACIÓN ULTRA-ESTABLE:%n");
+            System.out.printf("📊 CONFIGURACIÓN:%n");
             System.out.printf("  • Tamaño archivo: %.2f MB%n", fileSize / (1024.0 * 1024.0));
             System.out.printf("  • Líneas estimadas: %,d%n", estimatedLines);
             System.out.printf("  • Batch size: %,d datagramas%n", batchSize);
             System.out.printf("  • Lotes estimados: %,d%n", (estimatedLines + batchSize - 1) / batchSize);
-            System.out.printf("  • Workers: %s%n", master.getSystemStatus());
 
             long totalProcessed = 0;
             int batchNumber = 0;
             int successfulBatches = 0;
             List<VelocityResult> allResults = new ArrayList<>();
-            long totalProcessTime = 0;
             long startTime = System.currentTimeMillis();
 
+            // USAR CONSTRUCTOR CORRECTO (2 parámetros)
             try (StreamingDatagramReader reader = new StreamingDatagramReader(filePath, batchSize)) {
                 BusDatagram[] batch;
 
@@ -168,7 +163,6 @@ public class PerformanceClient {
                     System.out.printf("🔄 Lote %,d: %,d datagramas (Progreso: %,d/%,d)%n",
                             batchNumber, batch.length, totalProcessed + batch.length, estimatedLines);
 
-                    // PROCESAR con batches pequeños - MENOS reintentos
                     VelocityResult[] batchResults = processTinyBatch(batch, batchNumber);
                     
                     if (batchResults.length > 0) {
@@ -178,14 +172,13 @@ public class PerformanceClient {
                     
                     totalProcessed += batch.length;
 
-                    // PAUSAS MÁS LARGAS Y FRECUENTES
+                    // Pausas conservadoras
                     applyConservativePause(batchNumber, successfulBatches);
                     
-                    // Mostrar progreso cada 50 lotes (o más frecuente para archivos pequeños)
-                    int progressInterval = label.contains("MIL") ? 10 : 50;
-                    if (batchNumber % progressInterval == 0) {
+                    // Progreso
+                    if (batchNumber % 50 == 0) {
                         double progress = (totalProcessed * 100.0) / estimatedLines;
-                        System.out.printf("📈 Progreso: %,d/%,d (%.1f%%) - Lotes exitosos: %d/%d%n",
+                        System.out.printf("📈 Progreso: %,d/%,d (%.1f%%) - Exitosos: %d/%d%n",
                                 totalProcessed, estimatedLines, progress, successfulBatches, batchNumber);
                     }
                 }
@@ -194,51 +187,44 @@ public class PerformanceClient {
             long endTime = System.currentTimeMillis();
             long processingTime = endTime - startTime;
             
-            // GUARDAR TODOS LOS DATOS ANTES DE IMPRIMIR RESULTADOS
+            // GUARDAR TODOS LOS DATOS
             saveAllData(label, allResults, totalProcessed, processingTime, batchNumber, successfulBatches);
             
             printStableResults(allResults, totalProcessed, batchNumber, successfulBatches, 
                              label, processingTime);
 
         } catch (Exception e) {
-            System.err.println("❌ Error en procesamiento estable: " + e.getMessage());
+            System.err.println("❌ Error en procesamiento: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
 
-    /**
-     * GUARDA TODOS LOS DATOS USANDO VelocityFileManager
-     */
     private void saveAllData(String label, List<VelocityResult> results, 
                            long datagramCount, long processingTime,
                            int batchCount, int successfulBatches) {
         try {
-            System.out.println("\n💾 GUARDANDO DATOS PERSISTENTES...");
+            System.out.println("\n💾 GUARDANDO DATOS...");
             
-            // Convertir lista a array para el método de guardado
             VelocityResult[] resultsArray = results.toArray(new VelocityResult[0]);
             
-            // 1. Guardar resultados de velocidad
+            // 1. Resultados de velocidad
             VelocityFileManager.saveVelocityResults(resultsArray, label, datagramCount, processingTime);
             
-            // 2. Calcular throughput para métricas
+            // 2. Métricas de performance
             double throughput = processingTime > 0 ? (datagramCount / (double) processingTime) * 1000 : 0;
-            
-            // 3. Obtener número de workers
             String status = master.getSystemStatus();
             int workers = extractWorkerCount(status);
             
-            // 4. Guardar métricas de performance
             VelocityFileManager.savePerformanceMetrics(label, datagramCount, processingTime, 
                     batchCount, workers, throughput);
             
-            // 5. Guardar datos para análisis de punto de corte
+            // 3. Datos para punto de corte
             VelocityFileManager.saveCutoffPointData(label, workers, batchCount, processingTime, throughput);
             
-            // 6. Guardar resumen estadístico
+            // 4. Resumen estadístico
             VelocityFileManager.saveSummaryStats(label, results, datagramCount, processingTime);
             
-            System.out.println("✅ TODOS LOS DATOS GUARDADOS EXITOSAMENTE");
+            System.out.println("✅ TODOS LOS DATOS GUARDADOS");
             
         } catch (Exception e) {
             System.err.println("❌ Error guardando datos: " + e.getMessage());
@@ -247,7 +233,6 @@ public class PerformanceClient {
     }
 
     private VelocityResult[] processTinyBatch(BusDatagram[] batch, int batchNumber) {
-        // SOLO 2 reintentos para batches pequeños
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 VelocityResult[] results = master.processHistoricalData(batch, null, null);
@@ -259,7 +244,6 @@ public class PerformanceClient {
                 
                 if (attempt < 2) {
                     try {
-                        // Pausa más larga entre reintentos
                         Thread.sleep(5000);
                         if (e instanceof Ice.ConnectionLostException) {
                             reconnectToMaster();
@@ -272,23 +256,20 @@ public class PerformanceClient {
             }
         }
         
-        System.err.printf("   💥 Lote %,d - Falló después de 2 intentos, continuando...%n", batchNumber);
+        System.err.printf("   💥 Lote %,d falló, continuando...%n", batchNumber);
         return new VelocityResult[0];
     }
 
     private void applyConservativePause(int batchNumber, int successfulBatches) {
         try {
-            int pauseMs = 1000; // Pausa base de 1 segundo entre lotes
+            int pauseMs = 1000;
             
-            // Pausas más largas cada cierto número de lotes
             if (batchNumber % 10 == 0) pauseMs = 3000;
             if (batchNumber % 50 == 0) pauseMs = 5000;
             if (batchNumber % 100 == 0) pauseMs = 10000;
             
-            // Pausa extra si hay muchos lotes exitosos consecutivos
             if (successfulBatches > 10 && successfulBatches % 20 == 0) {
                 pauseMs += 2000;
-                System.out.printf("   💤 Pausa extendida de %,d ms (lotes estables)%n", pauseMs);
             }
             
             Thread.sleep(pauseMs);
@@ -301,7 +282,7 @@ public class PerformanceClient {
         try {
             System.out.println("🔄 Reestableciendo conexión...");
             shutdown();
-            Thread.sleep(10000); // 10 segundos
+            Thread.sleep(10000);
             initialize(new String[]{});
             System.out.println("✅ Conexión reestablecida");
         } catch (Exception e) {
@@ -313,20 +294,19 @@ public class PerformanceClient {
             int totalBatches, int successfulBatches, String label, long totalTime) {
         
         System.out.println("\n" + "=".repeat(100));
-        System.out.println("🎯 RESULTADOS MODO ESTABLE - " + label);
+        System.out.println("🎯 RESULTADOS - " + label);
         System.out.println("=".repeat(100));
 
         double successRate = (successfulBatches * 100.0) / totalBatches;
         
         System.out.printf("📦 Datagramas procesados: %,d%n", datagramCount);
-        System.out.printf("⏱ Tiempo total: %,d ms (%.2f horas)%n", totalTime, totalTime / 3600000.0);
+        System.out.printf("⏱ Tiempo total: %,d ms (%.2f minutos)%n", totalTime, totalTime / 60000.0);
         System.out.printf("🔢 Lotes: %d exitosos / %d totales (%.1f%% éxito)%n", 
                 successfulBatches, totalBatches, successRate);
 
         double throughput = totalTime > 0 ? (datagramCount / (double) totalTime) * 1000 : 0;
         System.out.printf("⚡ Throughput: %,d datagramas/segundo%n", (int)throughput);
 
-        // Métricas de calidad
         int validResults = (int) results.stream()
             .filter(r -> r.sampleCount > 0 && r.averageVelocity > 0)
             .count();
@@ -339,19 +319,7 @@ public class PerformanceClient {
         System.out.printf("📊 Resultados válidos: %,d/%,d (%,d muestras)%n",
                 validResults, results.size(), totalSamples);
 
-        // DATOS PARA LA GUÍA - AUNQUE EL PROCESAMIENTO SEA LENTO
-        System.out.println("\n📈 DATOS PARA REQUERIMIENTOS D y E:");
-        System.out.println("Tamaño, Workers, LotesExitosos, LotesTotales, TiempoTotal(ms), Throughput, TasaExito");
-        
-        String status = master.getSystemStatus();
-        int workers = extractWorkerCount(status);
-        
-        System.out.printf("%,d, %d, %d, %d, %,d, %d, %.1f%n",
-                datagramCount, workers, successfulBatches, totalBatches, 
-                totalTime, (int)throughput, successRate);
-                
-        System.out.println("\n💾 NOTA: Todos los datos han sido guardados en archivos CSV y TXT");
-        System.out.println("   en el directorio './results/' para su análisis posterior");
+        System.out.println("\n💾 Datos guardados en ./results/");
     }
 
     private int extractWorkerCount(String status) {
@@ -382,19 +350,10 @@ public class PerformanceClient {
             System.out.println("Uso: PerformanceClient <directorio_datos>");
             System.out.println("Ejemplo: PerformanceClient ./data");
             System.out.println("");
-            System.out.println("MODO ULTRA-ESTABLE ACTIVADO:");
+            System.out.println("PROCESAMIENTO CON ODÓMETRO REAL:");
             System.out.println("  • Batch size: 1,000 datagramas");
-            System.out.println("  • Pausas frecuentes entre lotes");
-            System.out.println("  • Prioriza COMPLETAR sobre velocidad");
-            System.out.println("  • Persistencia AUTOMÁTICA de todos los datos");
-            System.out.println("");
-            System.out.println("ARCHIVOS A PROCESAR:");
-            System.out.println("  • datagrams_1000.csv (1 MIL)");
-            System.out.println("  • datagrams_10000.csv (10 MIL)");
-            System.out.println("  • datagrams_100000.csv (100 MIL)");
-            System.out.println("  • datagrams_1M.csv (1 MILLÓN)");
-            System.out.println("  • datagrams_10M.csv (10 MILLONES)");
-            System.out.println("  • datagrams_100M.csv (100 MILLONES)");
+            System.out.println("  • Cálculo: velocidad = (odometer2 - odometer1) / (tiempo2 - tiempo1)");
+            System.out.println("  • Formato CSV: eventType,date,stopId,odometer,lat,lon,taskId,lineId,tripId,unknown,timestamp,busId");
             return;
         }
 
@@ -404,10 +363,8 @@ public class PerformanceClient {
             client.initialize(args);
             client.runUltraStableProcessing(args[0]);
             
-            System.out.println("\n🎯 PROCESAMIENTO COMPLETADO - DATOS LISTOS PARA ENTREGA");
-            System.out.println("📊 Aunque sea lento, lo importante es que TERMINA");
-            System.out.println("💾 TODOS LOS DATOS GUARDADOS EN: ./results/");
-            System.out.println("📈 Use los archivos CSV generados para los requerimientos D y E");
+            System.out.println("\n🎯 PROCESAMIENTO COMPLETADO");
+            System.out.println("📊 TODOS LOS DATOS EN: ./results/");
             System.out.println("\nPresiona ENTER para salir...");
             System.in.read();
             
