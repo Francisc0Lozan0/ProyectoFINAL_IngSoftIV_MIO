@@ -180,7 +180,8 @@ public class PerformanceClient {
         try {
             client.initialize(args);
             
-            int[] testSizes = {100000};
+            //  CAMBIA SOLO ESTA LÍNEA para los 3 tamaños logarítmicos:
+            int[] testSizes = {10000, 50000, 100000, 500000};
             
             client.runTest(args[0], testSizes);
             

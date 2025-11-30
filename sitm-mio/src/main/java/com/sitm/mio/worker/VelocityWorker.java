@@ -64,7 +64,13 @@ public class VelocityWorker extends _WorkerDisp {
                 System.err.println("Worker DB persist error (non-critical): " + ex.getMessage());
             }
 
-            // Serializar los datos de velocidad en periodStart
+            // CRÍTICO: Retornar UN resultado agregado que contiene la info de todos los arcos
+            // El master luego expandirá esto en resultados individuales
+            VelocityResult aggregatedResult = new VelocityResult();
+            aggregatedResult.arcId = "aggregated-" + task.taskId;
+            aggregatedResult.processingTime = System.currentTimeMillis() - startTime;
+            
+            // Serializar los datos de velocidad en periodStart (hack temporal)
             // Formato: "arcId1:velocity1:samples1|arcId2:velocity2:samples2|..."
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, List<Double>> entry : arcVelocities.entrySet()) {
@@ -81,10 +87,7 @@ public class VelocityWorker extends _WorkerDisp {
                 }
             }
             
-            VelocityResult aggregatedResult = new VelocityResult();
-            aggregatedResult.arcId = "aggregated-" + task.taskId;
             aggregatedResult.periodStart = sb.toString();
-            aggregatedResult.processingTime = System.currentTimeMillis() - startTime;
             aggregatedResult.sampleCount = arcVelocities.values().stream()
                 .mapToInt(List::size).sum();
             
@@ -112,8 +115,6 @@ public class VelocityWorker extends _WorkerDisp {
             errorResult.averageVelocity = 0.0;
             errorResult.sampleCount = 0;
             errorResult.processingTime = System.currentTimeMillis() - startTime;
-            errorResult.periodStart = "";
-            errorResult.periodEnd = "";
             return errorResult;
         }
     }
@@ -134,8 +135,6 @@ public class VelocityWorker extends _WorkerDisp {
             VelocityResult result = new VelocityResult();
             result.arcId = "streaming-" + window.windowId;
             result.processingTime = System.currentTimeMillis() - startTime;
-            result.periodStart = "";
-            result.periodEnd = "";
             
             double totalVelocity = 0.0;
             int totalSamples = 0;
@@ -157,8 +156,6 @@ public class VelocityWorker extends _WorkerDisp {
             errorResult.averageVelocity = 0.0;
             errorResult.sampleCount = 0;
             errorResult.processingTime = System.currentTimeMillis() - startTime;
-            errorResult.periodStart = "";
-            errorResult.periodEnd = "";
             return errorResult;
         }
     }
@@ -196,15 +193,6 @@ public class VelocityWorker extends _WorkerDisp {
         
         Map<String, List<Double>> velocitiesByArc = new HashMap<>();
         
-        // Crear mapa de arcos por lineId-startStop-endStop para búsqueda rápida
-        Map<String, Arc> arcLookup = new HashMap<>();
-        for (Arc arc : arcs) {
-            String key = arc.lineId + "-" + arc.startStopId + "-" + arc.endStopId;
-            arcLookup.put(key, arc);
-        }
-        
-        System.out.println("Worker " + workerId + " - Arc lookup created with " + arcLookup.size() + " entries");
-        
         for (List<BusDatagram> tripData : tripDatagrams.values()) {
             if (tripData.size() < 2) continue;
             
@@ -212,28 +200,64 @@ public class VelocityWorker extends _WorkerDisp {
                 BusDatagram d1 = tripData.get(i);
                 BusDatagram d2 = tripData.get(i + 1);
                 
-                // Buscar el arco correspondiente usando el lookup
-                String lookupKey = d1.lineId + "-" + d1.stopId + "-" + d2.stopId;
-                Arc arc = arcLookup.get(lookupKey);
+                // Intentar encontrar el arco correspondiente
+                Arc arc = findArcForDatagrams(d1, d2, arcs);
                 
                 if (arc != null && arc.distance > 0) {
-                    // USAR EL ARCID DEL ARCO DIRECTAMENTE
                     double velocity = calculateVelocity(d1, d2, arc.distance);
-                    if (velocity > 0 && velocity < 50) {
+                    if (velocity > 0 && velocity < 50) { // Filtro de velocidades razonables
                         velocitiesByArc.computeIfAbsent(arc.arcId, k -> new ArrayList<>()).add(velocity);
-                        System.out.println("Worker " + workerId + " - Matched arc: " + arc.arcId + 
-                                         " velocity: " + String.format("%.2f m/s", velocity));
                     }
                 } else {
-                    System.out.println("Worker " + workerId + " - No arc found for: " + lookupKey);
+                    // Si no hay arco definido, crear un arcId basado en los stops
+                    String syntheticArcId = createSyntheticArcId(d1, d2);
+                    double distance = calculateDistanceFromCoordinates(d1, d2);
+                    
+                    if (distance > 0) {
+                        double velocity = calculateVelocity(d1, d2, distance);
+                        if (velocity > 0 && velocity < 50) {
+                            velocitiesByArc.computeIfAbsent(syntheticArcId, k -> new ArrayList<>()).add(velocity);
+                        }
+                    }
                 }
             }
         }
         
-        System.out.println("Worker " + workerId + " - Calculated velocities for " + 
-                         velocitiesByArc.size() + " arcs");
-        
         return velocitiesByArc;
+    }
+
+    private Arc findArcForDatagrams(BusDatagram d1, BusDatagram d2, Arc[] arcs) {
+        for (Arc arc : arcs) {
+            if (arc.lineId.equals(d1.lineId)) {
+                if (d1.stopId.equals(arc.startStopId) && d2.stopId.equals(arc.endStopId)) {
+                    return arc;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String createSyntheticArcId(BusDatagram d1, BusDatagram d2) {
+        // Crear un ID sintético basado en line, stops y secuencia
+        return String.format("ARC_%s_%s_%s", d1.lineId, d1.stopId, d2.stopId);
+    }
+
+    private double calculateDistanceFromCoordinates(BusDatagram d1, BusDatagram d2) {
+        // Fórmula de Haversine para calcular distancia entre coordenadas
+        final int R = 6371000; // Radio de la Tierra en metros
+        
+        double lat1 = Math.toRadians(d1.latitude);
+        double lat2 = Math.toRadians(d2.latitude);
+        double dLat = Math.toRadians(d2.latitude - d1.latitude);
+        double dLon = Math.toRadians(d2.longitude - d1.longitude);
+        
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                 + Math.cos(lat1) * Math.cos(lat2)
+                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return R * c;
     }
 
     private double calculateVelocity(BusDatagram d1, BusDatagram d2, double arcDistance) {
