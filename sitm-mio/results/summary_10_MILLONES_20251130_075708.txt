@@ -1,0 +1,29 @@
+================================================================================
+RESUMEN DE PROCESAMIENTO - SITM MIO
+================================================================================
+
+Test: 10 MILLONES
+Timestamp: 2025-11-30T07:57:08.081525800
+Datagramas procesados: 7,864,467
+Tiempo total: 12,379,914 ms (206.33 minutos)
+
+ESTADÍSTICAS DE VELOCIDAD:
+--------------------------------------------------------------------------------
+Resultados válidos: 1,048 / 1,048
+Muestras totales: 1,048
+Velocidad promedio: 15.28 m/s (55.0 km/h)
+Velocidad máxima: 49.96 m/s (179.9 km/h)
+Velocidad mínima: 0.00 m/s (0.0 km/h)
+
+TOP 10 ARCOS MÁS RÁPIDOS:
+--------------------------------------------------------------------------------
+  ARC_A04_510978_511274         :  49.96 m/s (179.9 km/h) - 1 muestras
+  ARC_438_518061_518061         :  49.23 m/s (177.2 km/h) - 1 muestras
+  ARC_420_517046_517167         :  49.14 m/s (176.9 km/h) - 1 muestras
+  ARC_801_502351_502351         :  49.00 m/s (176.4 km/h) - 1 muestras
+  ARC_557_511276_511276         :  49.00 m/s (176.4 km/h) - 1 muestras
+  ARC_A19_511489_510782         :  48.82 m/s (175.7 km/h) - 1 muestras
+  ARC_838_501050_501050         :  48.55 m/s (174.8 km/h) - 1 muestras
+  ARC_10_501150_501052          :  48.51 m/s (174.7 km/h) - 1 muestras
+  ARC_746_514344_514344         :  48.38 m/s (174.2 km/h) - 1 muestras
+  ARC_151_515013_515013         :  47.98 m/s (172.7 km/h) - 1 muestras

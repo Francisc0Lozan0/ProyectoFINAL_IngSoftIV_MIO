@@ -441,6 +441,82 @@ generated/
 *.log
 logs/
 
-# Datos grandes
-data/large-*.csv
+# =============================================================================
+
+# =============================================================================
+
+# Bloquear TODOS los archivos CSV de datos (sin excepciones)
+*.csv
+!pom.xml
+!*.java
+!*.md
+!*.txt
+!*.properties
+!*.config
+
+# Bloquear TODA la carpeta data y todo su contenido RECURSIVAMENTE
+data/
+**/data/
+**/data/**
+**/data/**/*
+**/data/**/**/*
+data/*
+data/**/*
+data/**/**/*
+
+# Bloquear archivos específicos de datos grandes (patrones comunes)
+*datagrams*
+*datagramas*
+*_1M.*
+*_10M.*
+*_100M.*
+*_36GB.*
+*large-*
+*big-*
+*test_data*
+*dataset*
+
+# Bloquear resultados y outputs que pueden ser grandes
+results/
+**/results/
 test_output/
+**/test_output/
+output/
+**/output/
+generated_data/
+**/generated_data/
+
+# Bloquear cualquier directorio que pueda contener datos
+raw_data/
+**/raw_data/
+processed_data/
+**/processed_data/
+datasets/
+**/datasets/
+archive/
+**/archive/
+backup/
+**/backup/
+
+# =============================================================================
+
+# =============================================================================
+
+# Permitir solo archivos de código y configuración
+!src/**/*.java
+!src/**/*.ice
+!*.java
+!*.ice
+!*.md
+!*.txt
+!*.xml
+!*.properties
+!*.gitignore
+!*.config
+!Dockerfile
+!*.sh
+!*.bat
+
+# Permitir estructura de directorios necesaria pero NO archivos de datos
+!data/.gitkeep
+!**/data/.gitkeep
