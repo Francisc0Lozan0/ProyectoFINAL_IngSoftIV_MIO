@@ -284,12 +284,12 @@ procesamiento se vuelve necesaria.
 
 ### 3.1 Tabla de Resultados Completos
 
-| Escala | Datagramas | Tiempo (min) | Throughput (d/s) | Batches | Eficiencia |
-|--------|-----------|--------------|------------------|---------|------------|
+| Escala | Datagramas | Tiempo (min) | Throughput (d/s) | Batches | Eficiencia (d/s/w) |
+|:-------------|-------------:|-------------:|-----------------:|----------:|-------------------:|
 """
     
     for _, row in df.iterrows():
-        report += f"| {row['scale']} | {row['datagram_count']:,} | {row['processing_time_min']:.2f} | {row['throughput_dps']:.2f} | {row['batches']:,} | {row['efficiency']:.2f} |\n"
+        report += f"| {row['scale']:<12} | {row['datagram_count']:>12,} | {row['processing_time_min']:>12.2f} | {row['throughput_dps']:>16.2f} | {row['batches']:>9,} | {row['efficiency']:>18.2f} |\n"
     
     report += f"""
 

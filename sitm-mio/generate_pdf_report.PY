@@ -307,11 +307,11 @@ def generate_pdf_report(df):
     story.append(Paragraph("3. Resultados Experimentales", heading2_style))
     story.append(Paragraph("3.1 Tabla de Resultados Completos", heading3_style))
     
-    results_data = [['<b>Escala</b>', '<b>Datagramas</b>', '<b>Tiempo<br/>(min)</b>', 
-                     '<b>Throughput<br/>(d/s)</b>', '<b>Batches</b>', '<b>Eficiencia<br/>(d/s/w)</b>']]
+    results_data = [['Escala', 'Datagramas', 'Tiempo\n(min)', 
+                     'Throughput\n(d/s)', 'Batches', 'Eficiencia\n(d/s/w)']]
     for _, row in df.iterrows():
         results_data.append([
-            f"<b>{row['scale']}</b>",
+            f"{row['scale']}",
             f"{row['datagram_count']:,}",
             f"{row['processing_time_min']:.2f}",
             f"{row['throughput_dps']:.2f}",
@@ -319,23 +319,27 @@ def generate_pdf_report(df):
             f"{row['efficiency']:.2f}"
         ])
     
-    results_table = Table(results_data, colWidths=[1*inch, 1.2*inch, 0.8*inch, 1*inch, 0.9*inch, 1.1*inch])
+    results_table = Table(results_data, colWidths=[1.1*inch, 1.3*inch, 0.85*inch, 1.05*inch, 0.9*inch, 1.1*inch])
     results_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E86AB')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 1), (0, -1), 9),
+        ('FONTNAME', (1, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (1, 1), (-1, -1), 9),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
     ]))
     story.append(results_table)
     
