@@ -363,14 +363,25 @@
                     fetch(`${API_BASE}/data/linestops`)
                 ]);
                 
-                stops = await stopsRes.json();
-                lines = await linesRes.json();
-                lineStops = await lineStopsRes.json();
+                const stopsData = await stopsRes.json();
+                const linesData = await linesRes.json();
+                const lineStopsData = await lineStopsRes.json();
+                
+                console.log('Respuestas recibidas:', { stopsData, linesData, lineStopsData });
+                
+                // Extraer data de la respuesta (manejar ambos formatos)
+                stops = Array.isArray(stopsData) ? stopsData : (stopsData.data || []);
+                lines = Array.isArray(linesData) ? linesData : (linesData.data || []);
+                lineStops = Array.isArray(lineStopsData) ? lineStopsData : (lineStopsData.data || []);
                 
                 console.log(`Datos cargados: ${stops.length} paradas, ${lines.length} líneas, ${lineStops.length} relaciones`);
                 
-                populateLineSelector();
-                drawAllStops();
+                if (lines.length > 0) {
+                    populateLineSelector();
+                }
+                if (stops.length > 0) {
+                    drawAllStops();
+                }
             } catch (error) {
                 console.error('Error loading static data:', error);
             }
@@ -432,10 +443,10 @@
             document.getElementById('route-name').textContent = line.SHORTNAME;
             document.getElementById('route-desc').textContent = line.DESCRIPTION;
             
-            // Obtener paradas de esta línea
+            // Obtener paradas de esta línea ORDENADAS correctamente
             const stopsInLine = lineStops
                 .filter(ls => ls.LINEID == lineId)
-                .sort((a, b) => a.STOPSEQUENCE - b.STOPSEQUENCE);
+                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
             
             document.getElementById('route-stops').textContent = stopsInLine.length;
             
@@ -502,18 +513,28 @@
                 
                 console.log(`[HISTÓRICO] Respuesta recibida:`, result);
                 
-                if (result.success && result.data.length > 0) {
-                    const avgVel = result.data.reduce((sum, v) => sum + v.velocityKmh, 0) / result.data.length;
-                    console.log(`[HISTÓRICO] Velocidad promedio: ${avgVel.toFixed(1)} km/h (${result.data.length} registros)`);
+                // Manejar ambos formatos de respuesta
+                const velocityData = Array.isArray(result) ? result : (result.data || []);
+                
+                if (velocityData.length > 0) {
+                    // Calcular velocidad promedio usando el campo correcto
+                    const avgVel = velocityData.reduce((sum, v) => {
+                        const vel = v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
+                        return sum + vel;
+                    }, 0) / velocityData.length;
+                    
+                    console.log(`[HISTÓRICO] Velocidad promedio: ${avgVel.toFixed(1)} km/h (${velocityData.length} registros)`);
                     document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
                     
                     // Dibujar arcos con velocidades
-                    drawVelocityArcs(result.data);
+                    drawVelocityArcs(velocityData);
                 } else {
                     console.warn(`[HISTÓRICO] No hay datos de velocidad para la línea ${lineId}`);
+                    document.getElementById('avg-velocity').textContent = '0.0';
                 }
             } catch (error) {
                 console.error('Error loading velocities:', error);
+                document.getElementById('avg-velocity').textContent = 'Error';
             }
         }
 
@@ -523,14 +544,17 @@
             
             if (!selectedLineId) return;
             
-            // Obtener paradas de esta línea en orden
+            // Obtener paradas de esta línea ORDENADAS por STOPSEQUENCE
             const stopsInLine = lineStops
                 .filter(ls => ls.LINEID == selectedLineId)
-                .sort((a, b) => a.STOPSEQUENCE - b.STOPSEQUENCE);
+                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
             
             // Crear mapa de velocidades por promedio de línea
             const avgVelocity = velocityData.length > 0 
-                ? velocityData.reduce((sum, v) => sum + v.velocityKmh, 0) / velocityData.length 
+                ? velocityData.reduce((sum, v) => {
+                    const vel = v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
+                    return sum + vel;
+                }, 0) / velocityData.length 
                 : 0;
             
             // Dibujar arcos entre paradas consecutivas

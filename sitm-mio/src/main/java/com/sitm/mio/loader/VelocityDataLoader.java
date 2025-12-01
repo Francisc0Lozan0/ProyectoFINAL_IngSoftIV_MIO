@@ -40,8 +40,7 @@ public class VelocityDataLoader {
         try (Stream<Path> paths = Files.walk(resultsPath)) {
             List<Path> csvFiles = paths
                 .filter(Files::isRegularFile)
-                .filter(p -> p.getFileName().toString().startsWith("velocities_"))
-                .filter(p -> p.getFileName().toString().endsWith(".csv"))
+                .filter(p -> p.getFileName().toString().equals("velocities_100_MIL_20251130_162133.csv"))
                 .toList();
             
             System.out.println("Encontrados " + csvFiles.size() + " archivos de velocidades");

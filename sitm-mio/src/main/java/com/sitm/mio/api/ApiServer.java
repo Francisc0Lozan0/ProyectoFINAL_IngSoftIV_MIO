@@ -306,11 +306,12 @@ public class ApiServer {
                 
                 for (int i = 1; i < lines.size(); i++) {
                     String[] parts = parseCsvLine(lines.get(i));
-                    if (parts.length < 3) continue;
+                    if (parts.length < 4) continue;
                     
                     if (!first) json.append(",");
                     json.append("{\"LINEID\":\"").append(escapeJson(parts[0])).append("\",");
-                    json.append("\"SHORTNAME\":\"").append(escapeJson(parts[2])).append("\"}");
+                    json.append("\"SHORTNAME\":\"").append(escapeJson(parts[2])).append("\",");
+                    json.append("\"DESCRIPTION\":\"").append(escapeJson(parts[3])).append("\"}");
                     first = false;
                 }
                 json.append("]}");
@@ -448,155 +449,6 @@ public class ApiServer {
                 e.printStackTrace();
                 sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
-        }
-    }
-        
-        /**
-         * Procesa el siguiente lote de datagramas y calcula velocidades
-         */
-        private List<VelocityData> processNextBatch() throws IOException {
-            List<VelocityData> results = new ArrayList<>();
-            Path csvPath = Paths.get(STREAMING_FILE);
-            
-            if (!Files.exists(csvPath)) {
-                return results;
-            }
-            
-            try (BufferedReader reader = Files.newBufferedReader(csvPath)) {
-                String line;
-                long currentIndex = 0;
-                boolean headerSkipped = false;
-                
-                // Map para agrupar datagramas por trip (busId-tripId-lineId)
-                Map<String, List<DatagramPoint>> trips = new HashMap<>();
-                
-                while ((line = reader.readLine()) != null) {
-                    if (!headerSkipped) {
-                        headerSkipped = true;
-                        continue;
-                    }
-                    
-                    if (currentIndex < lastProcessedIndex) {
-                        currentIndex++;
-                        continue;
-                    }
-                    
-                    if (currentIndex >= lastProcessedIndex + BATCH_SIZE) {
-                        break;
-                    }
-                    
-                    // Parsear datagrama
-                    String[] parts = line.replace("\"", "").split(",");
-                    if (parts.length < 12) {
-                        currentIndex++;
-                        continue;
-                    }
-                    
-                    try {
-                        String stopId = parts[2].trim();
-                        double odometer = Double.parseDouble(parts[3].trim());
-                        double latitude = Double.parseDouble(parts[4].trim()) / 10_000_000.0;
-                        double longitude = Double.parseDouble(parts[5].trim()) / 10_000_000.0;
-                        String lineId = parts[7].trim();
-                        String tripId = parts[8].trim();
-                        String timestamp = parts[10].trim();
-                        String busId = parts[11].trim();
-                        
-                        // Validar coordenadas de Cali
-                        if (latitude < 3.0 || latitude > 4.0 || longitude > -76.0 || longitude < -77.0) {
-                            currentIndex++;
-                            continue;
-                        }
-                        
-                        String tripKey = busId + "-" + tripId + "-" + lineId;
-                        trips.computeIfAbsent(tripKey, k -> new ArrayList<>())
-                             .add(new DatagramPoint(stopId, odometer, timestamp, lineId));
-                        
-                    } catch (Exception e) {
-                        // Skip invalid lines
-                    }
-                    
-                    currentIndex++;
-                }
-                
-                lastProcessedIndex = currentIndex;
-                
-                // Calcular velocidades por trip
-                for (Map.Entry<String, List<DatagramPoint>> entry : trips.entrySet()) {
-                    List<DatagramPoint> points = entry.getValue();
-                    if (points.size() < 2) continue;
-                    
-                    // Ordenar por timestamp
-                    points.sort((p1, p2) -> p1.timestamp.compareTo(p2.timestamp));
-                    
-                    // Calcular velocidades entre puntos consecutivos
-                    for (int i = 0; i < points.size() - 1; i++) {
-                        DatagramPoint p1 = points.get(i);
-                        DatagramPoint p2 = points.get(i + 1);
-                        
-                        double distanceMeters = p2.odometer - p1.odometer;
-                        if (distanceMeters <= 0) continue;
-                        
-                        long timeDiffSeconds = getTimeDifferenceSeconds(p1.timestamp, p2.timestamp);
-                        if (timeDiffSeconds <= 0 || timeDiffSeconds > 3600) continue;
-                        
-                        double velocityKmh = (distanceMeters / timeDiffSeconds) * 3.6;
-                        if (velocityKmh > 0 && velocityKmh < 100) {
-                            String arcId = p1.stopId + "-" + p2.stopId;
-                            results.add(new VelocityData(arcId, velocityKmh, p1.lineId));
-                        }
-                    }
-                }
-            }
-            
-            return results;
-        }
-        
-        /**
-         * Calcula diferencia de tiempo en segundos entre dos timestamps
-         */
-        private long getTimeDifferenceSeconds(String ts1, String ts2) {
-            try {
-                java.time.format.DateTimeFormatter formatter = 
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                java.time.LocalDateTime dt1 = java.time.LocalDateTime.parse(ts1, formatter);
-                java.time.LocalDateTime dt2 = java.time.LocalDateTime.parse(ts2, formatter);
-                return java.time.temporal.ChronoUnit.SECONDS.between(dt1, dt2);
-            } catch (Exception e) {
-                return 0;
-            }
-        }
-    }
-    
-    /**
-     * Estructura auxiliar para punto de datagrama
-     */
-    static class DatagramPoint {
-        String stopId;
-        double odometer;
-        String timestamp;
-        String lineId;
-        
-        DatagramPoint(String stopId, double odometer, String timestamp, String lineId) {
-            this.stopId = stopId;
-            this.odometer = odometer;
-            this.timestamp = timestamp;
-            this.lineId = lineId;
-        }
-    }
-    
-    /**
-     * Estructura auxiliar para velocidad calculada
-     */
-    static class VelocityData {
-        String arcId;
-        double velocityKmh;
-        String lineId;
-        
-        VelocityData(String arcId, double velocityKmh, String lineId) {
-            this.arcId = arcId;
-            this.velocityKmh = velocityKmh;
-            this.lineId = lineId;
         }
     }
 
