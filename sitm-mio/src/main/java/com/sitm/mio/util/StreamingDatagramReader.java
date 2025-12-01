@@ -192,6 +192,50 @@ public class StreamingDatagramReader implements AutoCloseable {
         return Files.size(Paths.get(filePath));
     }
     
+    /**
+     * Carga todos los datagramas desde un archivo CSV
+     */
+    public static BusDatagram[] loadFromCSV(String filePath) throws IOException {
+        List<BusDatagram> datagrams = new ArrayList<>();
+        
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath))) {
+            String line;
+            boolean firstLine = true;
+            
+            while ((line = reader.readLine()) != null) {
+                if (firstLine) {
+                    firstLine = false;
+                    continue; // Skip header
+                }
+                
+                String[] parts = line.split(",");
+                if (parts.length < 12) continue;
+                
+                try {
+                    BusDatagram dgram = new BusDatagram();
+                    dgram.eventType = Integer.parseInt(parts[0].trim());
+                    // parts[1] es registerDate (no usado en BusDatagram)
+                    dgram.stopId = parts[2].trim();
+                    dgram.odometer = Double.parseDouble(parts[3].trim());
+                    dgram.latitude = Double.parseDouble(parts[4].trim()) / 10_000_000.0;
+                    dgram.longitude = Double.parseDouble(parts[5].trim()) / 10_000_000.0;
+                    // parts[6] es taskId (no usado en BusDatagram)
+                    dgram.lineId = parts[7].trim();
+                    dgram.tripId = parts[8].trim();
+                    // parts[9] es unknown1
+                    dgram.datagramDate = parts[10].trim();
+                    dgram.busId = parts[11].trim();
+                    
+                    datagrams.add(dgram);
+                } catch (Exception e) {
+                    // Skip invalid lines
+                }
+            }
+        }
+        
+        return datagrams.toArray(new BusDatagram[0]);
+    }
+    
     public long getTotalRead() {
         return totalRead;
     }

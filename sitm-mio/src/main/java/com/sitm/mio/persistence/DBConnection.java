@@ -13,11 +13,23 @@ public class DBConnection {
     static {
         try {
             HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(System.getenv().getOrDefault("JDBC_URL", "jdbc:postgresql://localhost:5432/sitm"));
-            config.setUsername(System.getenv().getOrDefault("JDBC_USER", "postgres"));
-            config.setPassword(System.getenv().getOrDefault("JDBC_PASSWORD", "postgres"));
+            
+            // Intentar H2 primero (para desarrollo sin Docker)
+            String jdbcUrl = System.getenv().getOrDefault("JDBC_URL", 
+                "jdbc:h2:file:./data/sitm_mio;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE");
+            config.setJdbcUrl(jdbcUrl);
+            
+            if (jdbcUrl.contains("h2")) {
+                config.setDriverClassName("org.h2.Driver");
+                config.setUsername("sa");
+                config.setPassword("");
+            } else {
+                config.setDriverClassName("org.postgresql.Driver");
+                config.setUsername(System.getenv().getOrDefault("JDBC_USER", "postgres"));
+                config.setPassword(System.getenv().getOrDefault("JDBC_PASSWORD", "postgres"));
+            }
+            
             config.setMaximumPoolSize(Integer.parseInt(System.getenv().getOrDefault("JDBC_MAX_POOL", "10")));
-            config.setDriverClassName("org.postgresql.Driver");
             
             // Configuración de timeouts para fallar rápido si no hay DB
             config.setConnectionTimeout(3000); // 3 segundos

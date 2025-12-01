@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIO - Mapa de Rutas y Velocidades</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 350px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .control-panel h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .stat-unit {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .route-info {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .route-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .route-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .route-info-label {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .route-info-value {
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .legend {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 10px;
+        }
+
+        .legend-label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-active {
+            background: #48bb78;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MIO - Sistema de Transporte Masivo</h1>
+        <p class="subtitle">Mapa de Rutas y Análisis de Velocidades en Tiempo Real</p>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <!-- Panel de Control -->
+            <div class="control-panel">
+                <h3>Modo de Visualización</h3>
+                <div class="mode-selector">
+                    <button class="mode-btn active" onclick="setMode('historical')">
+                        Histórico
+                    </button>
+                    <button class="mode-btn" onclick="setMode('streaming')">
+                        Streaming
+                    </button>
+                </div>
+                
+                <div id="streaming-status" style="display: none;">
+                    <span class="status-indicator status-active"></span>
+                    <span style="font-size: 12px; color: #666;">Actualizando cada 30s</span>
+                </div>
+            </div>
+
+            <!-- Selector de Ruta -->
+            <div class="control-panel">
+                <h3>Seleccionar Ruta</h3>
+                <select id="line-selector" onchange="selectLine()">
+                    <option value="">-- Todas las rutas --</option>
+                </select>
+                
+                <div id="route-info" class="route-info" style="display: none;">
+                    <div class="route-info-item">
+                        <span class="route-info-label">Ruta:</span>
+                        <span class="route-info-value" id="route-name">-</span>
+                    </div>
+                    <div class="route-info-item">
+                        <span class="route-info-label">Descripción:</span>
+                        <span class="route-info-value" id="route-desc">-</span>
+                    </div>
+                    <div class="route-info-item">
+                        <span class="route-info-label">Total Paradas:</span>
+                        <span class="route-info-value" id="route-stops">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas de Velocidad -->
+            <div class="stat-card">
+                <div class="stat-label">Velocidad Promedio</div>
+                <div class="stat-value" id="avg-velocity">-</div>
+                <div class="stat-unit">km/h</div>
+            </div>
+
+            <!-- Leyenda -->
+            <div class="control-panel legend">
+                <h3>Leyenda</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span class="legend-label">Paradas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span class="legend-label">Velocidad Alta (> 40 km/h)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span class="legend-label">Velocidad Media (20-40 km/h)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span class="legend-label">Velocidad Baja (< 20 km/h)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Configuración
+        const API_BASE = 'http://localhost:8080/api';
+        let map;
+        let currentMode = 'historical';
+        let streamingInterval;
+        let markersLayer;
+        let linesLayer;
+        let selectedLineId = null;
+        
+        // Datos cargados
+        let stops = [];
+        let lines = [];
+        let lineStops = [];
+        let velocities = {};
+
+        // Inicializar mapa
+        function initMap() {
+            // Centro de Cali, Colombia
+            map = L.map('map').setView([3.4516, -76.5320], 12);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            markersLayer = L.layerGroup().addTo(map);
+            linesLayer = L.layerGroup().addTo(map);
+        }
+
+        // Cargar datos estáticos
+        async function loadStaticData() {
+            console.log('Cargando datos estáticos del sistema...');
+            try {
+                const [stopsRes, linesRes, lineStopsRes] = await Promise.all([
+                    fetch(`${API_BASE}/data/stops`),
+                    fetch(`${API_BASE}/data/lines`),
+                    fetch(`${API_BASE}/data/linestops`)
+                ]);
+                
+                stops = await stopsRes.json();
+                lines = await linesRes.json();
+                lineStops = await lineStopsRes.json();
+                
+                console.log(`Datos cargados: ${stops.length} paradas, ${lines.length} líneas, ${lineStops.length} relaciones`);
+                
+                populateLineSelector();
+                drawAllStops();
+            } catch (error) {
+                console.error('Error loading static data:', error);
+            }
+        }
+
+        // Poblar selector de líneas
+        function populateLineSelector() {
+            const selector = document.getElementById('line-selector');
+            lines.forEach(line => {
+                const option = document.createElement('option');
+                option.value = line.LINEID;
+                option.textContent = `${line.SHORTNAME} - ${line.DESCRIPTION}`;
+                selector.appendChild(option);
+            });
+        }
+
+        // Dibujar todas las paradas
+        function drawAllStops() {
+            markersLayer.clearLayers();
+            
+            stops.forEach(stop => {
+                const marker = L.circleMarker(
+                    [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+                    {
+                        radius: 4,
+                        fillColor: '#3b82f6',
+                        color: '#fff',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }
+                ).bindPopup(`
+                    <strong>${stop.LONGNAME}</strong><br>
+                    ID: ${stop.STOPID}
+                `);
+                
+                markersLayer.addLayer(marker);
+            });
+        }
+
+        // Seleccionar línea
+        async function selectLine() {
+            const lineId = document.getElementById('line-selector').value;
+            selectedLineId = lineId;
+            
+            if (!lineId) {
+                linesLayer.clearLayers();
+                drawAllStops();
+                document.getElementById('route-info').style.display = 'none';
+                document.getElementById('avg-velocity').textContent = '-';
+                return;
+            }
+            
+            const line = lines.find(l => l.LINEID == lineId);
+            if (!line) return;
+            
+            // Mostrar info de ruta
+            document.getElementById('route-info').style.display = 'block';
+            document.getElementById('route-name').textContent = line.SHORTNAME;
+            document.getElementById('route-desc').textContent = line.DESCRIPTION;
+            
+            // Obtener paradas de esta línea
+            const stopsInLine = lineStops
+                .filter(ls => ls.LINEID == lineId)
+                .sort((a, b) => a.STOPSEQUENCE - b.STOPSEQUENCE);
+            
+            document.getElementById('route-stops').textContent = stopsInLine.length;
+            
+            // Dibujar ruta
+            drawLineRoute(stopsInLine);
+            
+            // Cargar velocidades
+            if (currentMode === 'historical') {
+                await loadHistoricalVelocities(lineId);
+            }
+        }
+
+        // Dibujar ruta de línea
+        function drawLineRoute(stopsInLine) {
+            markersLayer.clearLayers();
+            linesLayer.clearLayers();
+            
+            const coordinates = [];
+            
+            stopsInLine.forEach((ls, index) => {
+                const stop = stops.find(s => s.STOPID == ls.STOPID);
+                if (!stop) return;
+                
+                coordinates.push([stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE]);
+                
+                // Marcar paradas
+                const marker = L.circleMarker(
+                    [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+                    {
+                        radius: 6,
+                        fillColor: '#3b82f6',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }
+                ).bindPopup(`
+                    <strong>${stop.LONGNAME}</strong><br>
+                    Secuencia: ${ls.STOPSEQUENCE}<br>
+                    ID: ${stop.STOPID}
+                `);
+                
+                markersLayer.addLayer(marker);
+            });
+            
+            // Dibujar polilínea
+            if (coordinates.length > 1) {
+                const polyline = L.polyline(coordinates, {
+                    color: '#667eea',
+                    weight: 4,
+                    opacity: 0.7
+                });
+                linesLayer.addLayer(polyline);
+                map.fitBounds(polyline.getBounds());
+            }
+        }
+
+        // Cargar velocidades históricas
+        async function loadHistoricalVelocities(lineId) {
+            console.log(`[HISTÓRICO] Cargando velocidades para línea ${lineId}...`);
+            try {
+                const response = await fetch(`${API_BASE}/data/velocities/line/${lineId}`);
+                const result = await response.json();
+                
+                console.log(`[HISTÓRICO] Respuesta recibida:`, result);
+                
+                if (result.success && result.data.length > 0) {
+                    const avgVel = result.data.reduce((sum, v) => sum + v.velocityKmh, 0) / result.data.length;
+                    console.log(`[HISTÓRICO] Velocidad promedio: ${avgVel.toFixed(1)} km/h (${result.data.length} registros)`);
+                    document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
+                    
+                    // Dibujar arcos con velocidades
+                    drawVelocityArcs(result.data);
+                } else {
+                    console.warn(`[HISTÓRICO] No hay datos de velocidad para la línea ${lineId}`);
+                }
+            } catch (error) {
+                console.error('Error loading velocities:', error);
+            }
+        }
+
+        // Dibujar arcos con colores según velocidad
+        function drawVelocityArcs(velocityData) {
+            linesLayer.clearLayers();
+            
+            if (!selectedLineId) return;
+            
+            // Obtener paradas de esta línea en orden
+            const stopsInLine = lineStops
+                .filter(ls => ls.LINEID == selectedLineId)
+                .sort((a, b) => a.STOPSEQUENCE - b.STOPSEQUENCE);
+            
+            // Crear mapa de velocidades por promedio de línea
+            const avgVelocity = velocityData.length > 0 
+                ? velocityData.reduce((sum, v) => sum + v.velocityKmh, 0) / velocityData.length 
+                : 0;
+            
+            // Dibujar arcos entre paradas consecutivas
+            for (let i = 0; i < stopsInLine.length - 1; i++) {
+                const stop1 = stops.find(s => s.STOPID == stopsInLine[i].STOPID);
+                const stop2 = stops.find(s => s.STOPID == stopsInLine[i + 1].STOPID);
+                
+                if (!stop1 || !stop2) continue;
+                
+                // Color según velocidad promedio de la línea
+                let color = '#10b981'; // Verde (alta)
+                if (avgVelocity < 20) color = '#ef4444'; // Rojo (baja)
+                else if (avgVelocity < 40) color = '#f59e0b'; // Amarillo (media)
+                
+                const line = L.polyline([
+                    [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
+                    [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE]
+                ], {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.8
+                }).bindPopup(`
+                    <strong>Arco ${i + 1}</strong><br>
+                    De: ${stop1.LONGNAME}<br>
+                    A: ${stop2.LONGNAME}<br>
+                    Velocidad promedio línea: ${avgVelocity.toFixed(1)} km/h
+                `);
+                
+                linesLayer.addLayer(line);
+            }
+        }
+
+        // Cambiar modo
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Actualizar botones
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            console.log(`Modo cambiado a: ${mode}`);
+            
+            // Manejar streaming
+            if (mode === 'streaming') {
+                document.getElementById('streaming-status').style.display = 'block';
+                console.log('STREAMING ACTIVADO - Actualizando cada 30 segundos');
+                startStreaming();
+            } else {
+                document.getElementById('streaming-status').style.display = 'none';
+                console.log('Modo histórico activado - Consultando base de datos');
+                stopStreaming();
+                if (selectedLineId) {
+                    selectLine();
+                }
+            }
+        }
+
+        // Iniciar streaming
+        function startStreaming() {
+            stopStreaming();
+            console.log('Iniciando streaming - Primera carga...');
+            loadStreamingData();
+            streamingInterval = setInterval(() => {
+                console.log('[STREAMING] Actualizando datos automáticamente (cada 30s)...');
+                loadStreamingData();
+            }, 30000); // Cada 30 segundos
+            console.log('Intervalo de streaming configurado: cada 30 segundos');
+        }
+
+        // Detener streaming
+        function stopStreaming() {
+            if (streamingInterval) {
+                clearInterval(streamingInterval);
+                streamingInterval = null;
+                console.log('Streaming detenido');
+            }
+        }
+
+        // Cargar datos de streaming
+        async function loadStreamingData() {
+            const timestamp = new Date().toLocaleTimeString('es-CO');
+            console.log(`[${timestamp}] Solicitando datos de streaming...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/data/streaming`);
+                console.log(`[${timestamp}] Respuesta recibida del servidor:`, response.status);
+                
+                const result = await response.json();
+                console.log(`[${timestamp}] Datos parseados:`, result);
+                
+                if (result.success && result.data) {
+                    console.log(`[${timestamp}] Datos válidos recibidos: ${result.data.length} registros`);
+                    
+                    if (selectedLineId) {
+                        const lineData = result.data.filter(v => v.lineId == selectedLineId);
+                        console.log(`[${timestamp}] Filtrado para línea ${selectedLineId}: ${lineData.length} registros`);
+                        
+                        if (lineData.length > 0) {
+                            const avgVel = lineData.reduce((sum, v) => sum + v.velocityKmh, 0) / lineData.length;
+                            console.log(`[${timestamp}] Velocidad promedio calculada: ${avgVel.toFixed(1)} km/h`);
+                            document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
+                            drawVelocityArcs(lineData);
+                        } else {
+                            console.warn(`[${timestamp}] No hay datos para la línea ${selectedLineId}`);
+                        }
+                    } else {
+                        console.log(`[${timestamp}] No hay línea seleccionada`);
+                    }
+                } else {
+                    console.warn(`[${timestamp}] Respuesta sin datos o sin éxito`);
+                }
+            } catch (error) {
+                console.error(`[${timestamp}] Error cargando datos de streaming:`, error);
+            }
+        }
+
+        // Inicializar
+        window.onload = function() {
+            initMap();
+            loadStaticData();
+        };
+    </script>
+</body>
+</html>
