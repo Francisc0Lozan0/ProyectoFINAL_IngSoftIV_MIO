@@ -35,6 +35,19 @@ public class DataProcessingService {
      */
     public ProcessingResult processHistorical(String filePath, String testLabel, 
                                              Integer batchSize, Integer maxRecords) {
+        return processHistorical(filePath, testLabel, batchSize, maxRecords, 0);
+    }
+    
+    /**
+     * Procesa datos históricos desde un archivo CSV con offset
+     * @param filePath Ruta del archivo CSV
+     * @param testLabel Etiqueta para identificar este procesamiento
+     * @param batchSize Tamaño del lote para procesamiento
+     * @param maxRecords Número máximo de registros a procesar desde el offset
+     * @param offset Posición inicial en el archivo (para streaming incremental)
+     */
+    public ProcessingResult processHistorical(String filePath, String testLabel, 
+                                             Integer batchSize, Integer maxRecords, int offset) {
         ProcessingResult result = new ProcessingResult();
         result.setTestLabel(testLabel);
         result.setStartTime(LocalDateTime.now());
@@ -59,11 +72,30 @@ public class DataProcessingService {
             
             // Leer datagramas del archivo
             System.out.println("📖 Reading data from: " + filePath);
-            BusDatagram[] allDatagrams = StreamingDatagramReader.loadFromCSV(filePath);
+            BusDatagram[] fullDatagrams = StreamingDatagramReader.loadFromCSV(filePath);
             
-            // Limitar si es necesario
-            if (maxRecords != null && maxRecords > 0 && maxRecords < allDatagrams.length) {
-                allDatagrams = Arrays.copyOf(allDatagrams, maxRecords);
+            // Aplicar offset y limitar registros
+            BusDatagram[] allDatagrams;
+            if (offset > 0) {
+                System.out.printf("📍 Aplicando offset: %d (total en archivo: %d)%n", offset, fullDatagrams.length);
+                
+                if (offset >= fullDatagrams.length) {
+                    System.out.println("⚠️ Offset mayor o igual al tamaño del archivo, reiniciando desde el inicio");
+                    offset = 0;
+                }
+                
+                int endIndex = offset + (maxRecords != null && maxRecords > 0 ? maxRecords : fullDatagrams.length);
+                endIndex = Math.min(endIndex, fullDatagrams.length);
+                
+                allDatagrams = Arrays.copyOfRange(fullDatagrams, offset, endIndex);
+                System.out.printf("📊 Procesando registros [%d-%d] de %d%n", offset, endIndex - 1, fullDatagrams.length);
+            } else {
+                // Sin offset, limitar si es necesario
+                if (maxRecords != null && maxRecords > 0 && maxRecords < fullDatagrams.length) {
+                    allDatagrams = Arrays.copyOf(fullDatagrams, maxRecords);
+                } else {
+                    allDatagrams = fullDatagrams;
+                }
             }
             
             result.setTotalRecords(allDatagrams.length);

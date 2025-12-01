@@ -54,11 +54,13 @@ public class StreamingService {
             System.out.println("[STREAMING] Offset actual: " + currentOffset);
             
             // Procesar siguiente lote de datagramas con Ice Master + Workers
+            // Usar offset para lectura incremental
             DataProcessingService.ProcessingResult result = processingService.processHistorical(
                 STREAMING_FILE,
                 STREAMING_TEST_LABEL,
                 BATCH_SIZE,
-                BATCH_SIZE  // Solo procesar BATCH_SIZE registros
+                BATCH_SIZE,  // Solo procesar BATCH_SIZE registros
+                currentOffset  // Comenzar desde el offset actual
             );
             
             if (result.isSuccess()) {

@@ -216,6 +216,16 @@
             50% { opacity: 0.5; }
         }
 
+        @keyframes flash {
+            0% { background-color: #e8f5e9; }
+            50% { background-color: #a5d6a7; }
+            100% { background-color: #e8f5e9; }
+        }
+        
+        .updating {
+            animation: flash 0.6s ease-in-out;
+        }
+
         .loading {
             text-align: center;
             padding: 20px;
@@ -258,15 +268,17 @@
                     </button>
                 </div>
                 
-                <div id="streaming-status" style="display: none; margin-top: 10px; padding: 10px; background: #e8f5e9; border-radius: 5px; border-left: 4px solid #4caf50;">
+                <div id="streaming-status" style="display: none; margin-top: 10px; padding: 10px; background: #e8f5e9; border-radius: 5px; border-left: 4px solid #4caf50; transition: all 0.3s ease;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span class="status-indicator status-active"></span>
-                        <div>
+                        <div style="flex: 1;">
                             <div style="font-weight: bold; color: #2e7d32;">STREAMING ACTIVO</div>
                             <div style="font-size: 11px; color: #558b2f;">Actualizando cada 30s</div>
                             <div id="last-update" style="font-size: 10px; color: #689f38; margin-top: 3px;">Última actualización: --</div>
                             <div id="data-count" style="font-size: 10px; color: #689f38;">Registros: --</div>
+                            <div id="update-counter" style="font-size: 10px; color: #2e7d32; margin-top: 2px; font-weight: bold;">Actualizaciones: 0</div>
                         </div>
+                        <div id="update-indicator" style="display: none; font-size: 20px; animation: pulse 0.5s;">🔄</div>
                     </div>
                 </div>
             </div>
@@ -326,6 +338,10 @@
         let lines = [];
         let lineStops = [];
         let velocities = {};
+        
+        // Cache de streaming
+        let streamingCache = [];
+        let updateCount = 0;
 
         // Inicializar mapa
         function initMap() {
@@ -440,9 +456,28 @@
             // Dibujar ruta
             drawLineRoute(stopsInLine);
             
-            // Cargar velocidades
+            // Cargar velocidades según el modo
             if (currentMode === 'historical') {
                 await loadHistoricalVelocities(lineId);
+            } else if (currentMode === 'streaming') {
+                // En modo streaming, usar el cache actual si existe
+                if (streamingCache.length > 0) {
+                    const timestamp = new Date().toLocaleTimeString('es-CO');
+                    const lineData = streamingCache.filter(v => v.lineId == lineId);
+                    console.log(`[${timestamp}] 📍 Cambio de ruta a ${lineId}: ${lineData.length} registros en cache`);
+                    
+                    if (lineData.length > 0) {
+                        const avgVel = lineData.reduce((sum, v) => sum + v.velocityKmh, 0) / lineData.length;
+                        console.log(`[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(1)} km/h`);
+                        document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
+                        
+                        // Dibujar arcos con las velocidades en tiempo real
+                        drawVelocityArcsFromStreaming(lineData);
+                    } else {
+                        console.log(`[${timestamp}] ⚠️ Sin datos en cache para línea ${lineId}`);
+                        document.getElementById('avg-velocity').textContent = '-';
+                    }
+                }
             }
         }
 
@@ -619,6 +654,8 @@
                 clearInterval(streamingInterval);
                 streamingInterval = null;
                 console.log('Streaming detenido');
+                // Resetear contador al detener
+                updateCount = 0;
             }
         }
 
@@ -638,14 +675,44 @@
                 document.getElementById('last-update').textContent = `Última actualización: ${timestamp}`;
                 
                 if (result.success && result.data) {
-                    const responseData = result.data;
-                    const velocities = responseData.data || [];
-                    const lastUpdate = responseData.lastUpdate;
-                    const cacheSize = responseData.cacheSize || 0;
+                    // Manejar ambos formatos de respuesta:
+                    // ApiServer simple: {success: true, data: [...]}
+                    // Spring Boot: {success: true, data: {data: [...], cacheSize: 0, lastUpdate: ...}}
+                    let velocities, cacheSize, lastUpdate;
+                    
+                    if (Array.isArray(result.data)) {
+                        // Formato ApiServer simple
+                        velocities = result.data;
+                        cacheSize = velocities.length;
+                        lastUpdate = result.timestamp;
+                    } else {
+                        // Formato Spring Boot con StreamingService
+                        const responseData = result.data;
+                        velocities = responseData.data || [];
+                        cacheSize = responseData.cacheSize || 0;
+                        lastUpdate = responseData.lastUpdate;
+                    }
                     
                     console.log(`[${timestamp}] ✅ Datos recibidos: ${velocities.length} velocidades`);
                     console.log(`[${timestamp}] 📊 Cache: ${cacheSize} registros`);
                     console.log(`[${timestamp}] 🕐 Última actualización servidor: ${lastUpdate}`);
+                    
+                    // Guardar en cache global para uso al cambiar de ruta
+                    streamingCache = velocities;
+                    
+                    // Incrementar contador y mostrar indicador visual
+                    updateCount++;
+                    document.getElementById('update-counter').textContent = `Actualizaciones: ${updateCount}`;
+                    
+                    // Efecto flash en el panel
+                    const streamingStatus = document.getElementById('streaming-status');
+                    streamingStatus.classList.add('updating');
+                    setTimeout(() => streamingStatus.classList.remove('updating'), 600);
+                    
+                    // Mostrar icono de actualización brevemente
+                    const updateIndicator = document.getElementById('update-indicator');
+                    updateIndicator.style.display = 'block';
+                    setTimeout(() => updateIndicator.style.display = 'none', 1000);
                     
                     document.getElementById('data-count').textContent = `Registros en caché: ${cacheSize} | Mostrando: ${velocities.length}`;
                     document.getElementById('data-count').style.color = '#4caf50';
