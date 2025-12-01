@@ -21,8 +21,8 @@ public class VelocityDataLoader {
     
     private static final String RESULTS_DIR = "results";
     private static final String INSERT_SQL = 
-        "INSERT INTO velocity_records (arc_id, velocity_m_s, velocity_km_h, sample_count, line_id, test_label, timestamp) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO velocity_records (arc_id, velocity_m_s, velocity_km_h, sample_count, line_id, test_label, timestamp, created_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
     
     /**
      * Carga todos los archivos CSV de velocidades desde el directorio results
@@ -40,10 +40,10 @@ public class VelocityDataLoader {
         try (Stream<Path> paths = Files.walk(resultsPath)) {
             List<Path> csvFiles = paths
                 .filter(Files::isRegularFile)
-                .filter(p -> p.getFileName().toString().equals("velocities_100_MIL_20251130_162133.csv"))
+                .filter(p -> p.getFileName().toString().startsWith("velocities_10_MILLONES"))
                 .toList();
             
-            System.out.println("Encontrados " + csvFiles.size() + " archivos de velocidades");
+            System.out.println("Encontrados " + csvFiles.size() + " archivos de velocidades (10_MILLONES)");
             
             for (Path csvFile : csvFiles) {
                 // Extraer test_label del nombre del archivo (e.g., "velocities_1_MIL_..." -> "1_MIL")
@@ -104,6 +104,7 @@ public class VelocityDataLoader {
                         stmt.setString(5, parts[4].trim()); // line_id
                         stmt.setString(6, testLabel); // test_label
                         stmt.setString(7, parts[5].trim()); // timestamp
+                        // created_at se establece automáticamente con CURRENT_TIMESTAMP
                         
                         stmt.addBatch();
                         recordCount++;
@@ -156,6 +157,7 @@ public class VelocityDataLoader {
         
         String createIndexArc = "CREATE INDEX IF NOT EXISTS idx_velocity_arc_id ON velocity_records (arc_id)";
         String createIndexLine = "CREATE INDEX IF NOT EXISTS idx_velocity_line_id ON velocity_records (line_id)";
+        String createIndexTest = "CREATE INDEX IF NOT EXISTS idx_velocity_test_label ON velocity_records (test_label)";
         
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) return;
@@ -163,13 +165,20 @@ public class VelocityDataLoader {
             conn.createStatement().execute(createTableSQL);
             conn.createStatement().execute(createIndexArc);
             conn.createStatement().execute(createIndexLine);
+            conn.createStatement().execute(createIndexTest);
             
             // Crear vista (eliminar primero si existe)
             try {
                 conn.createStatement().execute("DROP VIEW IF EXISTS velocities");
-                conn.createStatement().execute("CREATE VIEW velocities AS SELECT id, arc_id, line_id, velocity_km_h, timestamp FROM velocity_records");
+                conn.createStatement().execute(
+                    "CREATE VIEW velocities AS " +
+                    "SELECT id, arc_id, line_id, velocity_m_s, velocity_km_h, " +
+                    "sample_count, test_label, timestamp " +
+                    "FROM velocity_records"
+                );
+                System.out.println("✓ Vista 'velocities' creada correctamente");
             } catch (SQLException e) {
-                // Ignorar si la vista no existe
+                System.err.println("⚠ Error creando vista: " + e.getMessage());
             }
             
             System.out.println("✓ Tabla velocity_records verificada/creada");

@@ -168,20 +168,6 @@ public class DataQueryController {
     }
     
     /**
-     * GET /api/data/lines
-     * Obtiene todas las líneas disponibles
-     */
-    @GetMapping("/lines")
-    public ApiResponse<List<String>> getLines() {
-        try {
-            List<String> lines = velocityRepository.findDistinctLineIds();
-            return ApiResponse.success(lines);
-        } catch (Exception e) {
-            return ApiResponse.error("Error retrieving lines: " + e.getMessage());
-        }
-    }
-    
-    /**
      * GET /api/data/velocities/line/{lineId}
      * Obtiene datos de una línea específica
      */

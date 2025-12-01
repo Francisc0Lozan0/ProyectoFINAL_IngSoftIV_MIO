@@ -258,9 +258,16 @@
                     </button>
                 </div>
                 
-                <div id="streaming-status" style="display: none;">
-                    <span class="status-indicator status-active"></span>
-                    <span style="font-size: 12px; color: #666;">Actualizando cada 30s</span>
+                <div id="streaming-status" style="display: none; margin-top: 10px; padding: 10px; background: #e8f5e9; border-radius: 5px; border-left: 4px solid #4caf50;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="status-indicator status-active"></span>
+                        <div>
+                            <div style="font-weight: bold; color: #2e7d32;">STREAMING ACTIVO</div>
+                            <div style="font-size: 11px; color: #558b2f;">Actualizando cada 30s</div>
+                            <div id="last-update" style="font-size: 10px; color: #689f38; margin-top: 3px;">Última actualización: --</div>
+                            <div id="data-count" style="font-size: 10px; color: #689f38;">Registros: --</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -294,26 +301,6 @@
                 <div class="stat-unit">km/h</div>
             </div>
 
-            <!-- Leyenda -->
-            <div class="control-panel legend">
-                <h3>Leyenda</h3>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #3b82f6;"></div>
-                    <span class="legend-label">Paradas</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #10b981;"></div>
-                    <span class="legend-label">Velocidad Alta (> 40 km/h)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #f59e0b;"></div>
-                    <span class="legend-label">Velocidad Media (20-40 km/h)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #ef4444;"></div>
-                    <span class="legend-label">Velocidad Baja (< 20 km/h)</span>
-                </div>
-            </div>
         </div>
 
         <div class="map-container">
@@ -638,38 +625,108 @@
         // Cargar datos de streaming
         async function loadStreamingData() {
             const timestamp = new Date().toLocaleTimeString('es-CO');
-            console.log(`[${timestamp}] Solicitando datos de streaming...`);
+            console.log(`[${timestamp}] 🔄 Solicitando datos de streaming...`);
             
             try {
                 const response = await fetch(`${API_BASE}/data/streaming`);
-                console.log(`[${timestamp}] Respuesta recibida del servidor:`, response.status);
+                console.log(`[${timestamp}] Respuesta recibida:`, response.status);
                 
                 const result = await response.json();
                 console.log(`[${timestamp}] Datos parseados:`, result);
                 
+                // Actualizar indicadores visuales
+                document.getElementById('last-update').textContent = `Última actualización: ${timestamp}`;
+                
                 if (result.success && result.data) {
-                    console.log(`[${timestamp}] Datos válidos recibidos: ${result.data.length} registros`);
+                    const responseData = result.data;
+                    const velocities = responseData.data || [];
+                    const lastUpdate = responseData.lastUpdate;
+                    const cacheSize = responseData.cacheSize || 0;
                     
-                    if (selectedLineId) {
-                        const lineData = result.data.filter(v => v.lineId == selectedLineId);
+                    console.log(`[${timestamp}] ✅ Datos recibidos: ${velocities.length} velocidades`);
+                    console.log(`[${timestamp}] 📊 Cache: ${cacheSize} registros`);
+                    console.log(`[${timestamp}] 🕐 Última actualización servidor: ${lastUpdate}`);
+                    
+                    document.getElementById('data-count').textContent = `Registros en caché: ${cacheSize} | Mostrando: ${velocities.length}`;
+                    document.getElementById('data-count').style.color = '#4caf50';
+                    document.getElementById('data-count').style.fontWeight = 'bold';
+                    
+                    if (selectedLineId && velocities.length > 0) {
+                        const lineData = velocities.filter(v => v.lineId == selectedLineId);
                         console.log(`[${timestamp}] Filtrado para línea ${selectedLineId}: ${lineData.length} registros`);
                         
                         if (lineData.length > 0) {
                             const avgVel = lineData.reduce((sum, v) => sum + v.velocityKmh, 0) / lineData.length;
-                            console.log(`[${timestamp}] Velocidad promedio calculada: ${avgVel.toFixed(1)} km/h`);
+                            console.log(`[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(1)} km/h`);
                             document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
-                            drawVelocityArcs(lineData);
+                            
+                            // Dibujar arcos con las velocidades en tiempo real
+                            drawVelocityArcsFromStreaming(lineData);
                         } else {
-                            console.warn(`[${timestamp}] No hay datos para la línea ${selectedLineId}`);
+                            console.warn(`[${timestamp}] ⚠️ No hay datos streaming para línea ${selectedLineId}`);
                         }
-                    } else {
-                        console.log(`[${timestamp}] No hay línea seleccionada`);
+                    } else if (velocities.length === 0) {
+                        console.warn(`[${timestamp}] ⚠️ Sin datos de velocidad en caché`);
                     }
                 } else {
-                    console.warn(`[${timestamp}] Respuesta sin datos o sin éxito`);
+                    console.warn(`[${timestamp}] ⚠️ Respuesta sin datos`);
+                    document.getElementById('data-count').textContent = 'Esperando datos...';
+                    document.getElementById('data-count').style.color = '#ff9800';
                 }
             } catch (error) {
-                console.error(`[${timestamp}] Error cargando datos de streaming:`, error);
+                console.error(`[${timestamp}] ❌ Error:`, error);
+                document.getElementById('data-count').textContent = 'Error en conexión';
+                document.getElementById('data-count').style.color = '#f44336';
+            }
+        }
+        
+        // Dibujar arcos con datos de streaming
+        function drawVelocityArcsFromStreaming(velocityData) {
+            linesLayer.clearLayers();
+            
+            if (!selectedLineId) return;
+            
+            // Obtener paradas de esta línea ORDENADAS
+            const stopsInLine = lineStops
+                .filter(ls => ls.LINEID == selectedLineId)
+                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
+            
+            // Crear mapa de velocidades por arco
+            const velocityByArc = {};
+            velocityData.forEach(v => {
+                velocityByArc[v.arcId] = v.velocityKmh;
+            });
+            
+            // Dibujar arcos entre paradas consecutivas
+            for (let i = 0; i < stopsInLine.length - 1; i++) {
+                const stop1 = stops.find(s => s.STOPID == stopsInLine[i].STOPID);
+                const stop2 = stops.find(s => s.STOPID == stopsInLine[i + 1].STOPID);
+                
+                if (!stop1 || !stop2) continue;
+                
+                const arcId = `${stopsInLine[i].STOPID}_${stopsInLine[i + 1].STOPID}`;
+                const velocity = velocityByArc[arcId] || 0;
+                
+                // Color según velocidad
+                let color = '#10b981'; // Verde (alta)
+                if (velocity < 20) color = '#ef4444'; // Rojo (baja)
+                else if (velocity < 40) color = '#f59e0b'; // Amarillo (media)
+                
+                const line = L.polyline([
+                    [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
+                    [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE]
+                ], {
+                    color: color,
+                    weight: 6,
+                    opacity: 0.9
+                }).bindPopup(`
+                    <strong>🔴 STREAMING - Arco ${i + 1}</strong><br>
+                    De: ${stop1.LONGNAME}<br>
+                    A: ${stop2.LONGNAME}<br>
+                    <strong>Velocidad actual: ${velocity.toFixed(1)} km/h</strong>
+                `);
+                
+                linesLayer.addLayer(line);
             }
         }
 

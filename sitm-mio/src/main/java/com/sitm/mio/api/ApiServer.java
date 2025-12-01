@@ -379,7 +379,7 @@ public class ApiServer {
                 }
 
                 PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT arc_id, velocity_km_h FROM velocities WHERE line_id = ? LIMIT 1000");
+                    "SELECT arc_id, velocity_km_h FROM velocity_records WHERE line_id = ? LIMIT 1000");
                 stmt.setString(1, lineId);
                 ResultSet rs = stmt.executeQuery();
                 

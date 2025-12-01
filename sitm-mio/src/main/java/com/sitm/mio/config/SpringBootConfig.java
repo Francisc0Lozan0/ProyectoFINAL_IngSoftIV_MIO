@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @SpringBootApplication
+@EnableScheduling  // Habilitar tareas programadas para streaming
 @ComponentScan(basePackages = "com.sitm.mio")
 @EntityScan(basePackages = "com.sitm.mio.entity")
 @EnableJpaRepositories(basePackages = "com.sitm.mio.repository")
