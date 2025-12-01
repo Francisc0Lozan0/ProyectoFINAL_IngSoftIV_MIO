@@ -1,807 +1,1411 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MIO - Mapa de Rutas y Velocidades</title>
-    
+
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            height: 100vh;
-            overflow: hidden;
-        }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        height: 100vh;
+        overflow: hidden;
+      }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 30px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
 
-        .header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
+      .header h1 {
+        font-size: 24px;
+        margin-bottom: 5px;
+      }
 
-        .header .subtitle {
-            font-size: 14px;
-            opacity: 0.9;
-        }
+      .header .subtitle {
+        font-size: 14px;
+        opacity: 0.9;
+      }
 
-        .container {
-            display: flex;
-            height: calc(100vh - 80px);
-        }
+      .container {
+        display: flex;
+        height: calc(100vh - 80px);
+      }
 
-        .sidebar {
-            width: 350px;
-            background: #f8f9fa;
-            border-right: 1px solid #dee2e6;
-            overflow-y: auto;
-            padding: 20px;
-        }
+      .sidebar {
+        width: 350px;
+        background: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+        overflow-y: auto;
+        padding: 20px;
+      }
 
-        .map-container {
-            flex: 1;
-            position: relative;
-        }
+      .map-container {
+        flex: 1;
+        position: relative;
+      }
 
-        #map {
-            width: 100%;
-            height: 100%;
-        }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
 
-        .control-panel {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+      .control-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
 
-        .control-panel h3 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 16px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 8px;
-        }
+      .control-panel h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 16px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 8px;
+      }
 
-        .mode-selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+      .mode-selector {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
 
-        .mode-btn {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
+      .mode-btn {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid #667eea;
+        background: white;
+        color: #667eea;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+      }
 
-        .mode-btn.active {
-            background: #667eea;
-            color: white;
-        }
+      .mode-btn.active {
+        background: #667eea;
+        color: white;
+      }
 
-        .mode-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-        }
+      .mode-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+      }
 
-        select, input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e2e8f0;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
+      select,
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e2e8f0;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
 
-        select:focus, input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
+      select:focus,
+      input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
 
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+      }
 
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+      .stat-label {
+        font-size: 12px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
 
-        .stat-value {
-            font-size: 32px;
-            font-weight: bold;
-            margin-top: 5px;
-        }
+      .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+        margin-top: 5px;
+      }
 
-        .stat-unit {
-            font-size: 14px;
-            opacity: 0.8;
-        }
+      .stat-unit {
+        font-size: 14px;
+        opacity: 0.8;
+      }
 
-        .route-info {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
+      .route-info {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+      }
 
-        .route-info-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
+      .route-info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
 
-        .route-info-item:last-child {
-            border-bottom: none;
-        }
+      .route-info-item:last-child {
+        border-bottom: none;
+      }
 
-        .route-info-label {
-            color: #666;
-            font-size: 13px;
-        }
+      .route-info-label {
+        color: #666;
+        font-size: 13px;
+      }
 
-        .route-info-value {
-            color: #333;
-            font-weight: bold;
-            font-size: 13px;
-        }
+      .route-info-value {
+        color: #333;
+        font-weight: bold;
+        font-size: 13px;
+      }
 
-        .legend {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-        }
+      .legend {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+      }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-        }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
 
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
-            margin-right: 10px;
-        }
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        margin-right: 10px;
+      }
 
-        .legend-label {
-            font-size: 13px;
-            color: #666;
-        }
+      .legend-label {
+        font-size: 13px;
+        color: #666;
+      }
 
-        .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
+      .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
 
-        .status-active {
-            background: #48bb78;
-            animation: pulse 2s infinite;
-        }
+      .status-active {
+        background: #48bb78;
+        animation: pulse 2s infinite;
+      }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
+        50% {
+          opacity: 0.5;
+        }
+      }
 
-        @keyframes flash {
-            0% { background-color: #e8f5e9; }
-            50% { background-color: #a5d6a7; }
-            100% { background-color: #e8f5e9; }
+      @keyframes flash {
+        0% {
+          background-color: #e8f5e9;
         }
-        
-        .updating {
-            animation: flash 0.6s ease-in-out;
+        50% {
+          background-color: #a5d6a7;
         }
+        100% {
+          background-color: #e8f5e9;
+        }
+      }
 
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
+      .updating {
+        animation: flash 0.6s ease-in-out;
+      }
 
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+      .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h1>MIO - Sistema de Transporte Masivo</h1>
-        <p class="subtitle">Mapa de Rutas y Análisis de Velocidades en Tiempo Real</p>
+      <h1>MIO - Sistema de Transporte Masivo</h1>
+      <p class="subtitle">
+        Mapa de Rutas y Análisis de Velocidades en Tiempo Real
+      </p>
     </div>
 
     <div class="container">
-        <div class="sidebar">
-            <!-- Panel de Control -->
-            <div class="control-panel">
-                <h3>Modo de Visualización</h3>
-                <div class="mode-selector">
-                    <button class="mode-btn active" onclick="setMode('historical')">
-                        Histórico
-                    </button>
-                    <button class="mode-btn" onclick="setMode('streaming')">
-                        Streaming
-                    </button>
-                </div>
-                
-                <div id="streaming-status" style="display: none; margin-top: 10px; padding: 10px; background: #e8f5e9; border-radius: 5px; border-left: 4px solid #4caf50; transition: all 0.3s ease;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="status-indicator status-active"></span>
-                        <div style="flex: 1;">
-                            <div style="font-weight: bold; color: #2e7d32;">STREAMING ACTIVO</div>
-                            <div style="font-size: 11px; color: #558b2f;">Actualizando cada 30s</div>
-                            <div id="last-update" style="font-size: 10px; color: #689f38; margin-top: 3px;">Última actualización: --</div>
-                            <div id="data-count" style="font-size: 10px; color: #689f38;">Registros: --</div>
-                            <div id="update-counter" style="font-size: 10px; color: #2e7d32; margin-top: 2px; font-weight: bold;">Actualizaciones: 0</div>
-                        </div>
-                        <div id="update-indicator" style="display: none; font-size: 20px; animation: pulse 0.5s;">🔄</div>
-                    </div>
-                </div>
-            </div>
+      <div class="sidebar">
+        <!-- Panel de Control -->
+        <div class="control-panel">
+          <h3>Modo de Visualización</h3>
+          <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('historical')">
+              Histórico
+            </button>
+            <button class="mode-btn" onclick="setMode('streaming')">
+              Streaming
+            </button>
+          </div>
 
-            <!-- Selector de Ruta -->
-            <div class="control-panel">
-                <h3>Seleccionar Ruta</h3>
-                <select id="line-selector" onchange="selectLine()">
-                    <option value="">-- Todas las rutas --</option>
-                </select>
-                
-                <div id="route-info" class="route-info" style="display: none;">
-                    <div class="route-info-item">
-                        <span class="route-info-label">Ruta:</span>
-                        <span class="route-info-value" id="route-name">-</span>
-                    </div>
-                    <div class="route-info-item">
-                        <span class="route-info-label">Descripción:</span>
-                        <span class="route-info-value" id="route-desc">-</span>
-                    </div>
-                    <div class="route-info-item">
-                        <span class="route-info-label">Total Paradas:</span>
-                        <span class="route-info-value" id="route-stops">-</span>
-                    </div>
+          <div
+            id="streaming-status"
+            style="
+              display: none;
+              margin-top: 10px;
+              padding: 10px;
+              background: #e8f5e9;
+              border-radius: 5px;
+              border-left: 4px solid #4caf50;
+              transition: all 0.3s ease;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span class="status-indicator status-active"></span>
+              <div style="flex: 1">
+                <div style="font-weight: bold; color: #2e7d32">
+                  STREAMING ACTIVO
                 </div>
+                <div style="font-size: 11px; color: #558b2f">
+                  Actualizando cada 30s
+                </div>
+                <div
+                  id="last-update"
+                  style="font-size: 10px; color: #689f38; margin-top: 3px"
+                >
+                  Última actualización: --
+                </div>
+                <div id="data-count" style="font-size: 10px; color: #689f38">
+                  Registros: --
+                </div>
+                <div
+                  id="update-counter"
+                  style="
+                    font-size: 10px;
+                    color: #2e7d32;
+                    margin-top: 2px;
+                    font-weight: bold;
+                  "
+                >
+                  Actualizaciones: 0
+                </div>
+              </div>
+              <div
+                id="update-indicator"
+                style="display: none; font-size: 20px; animation: pulse 0.5s"
+              >
+                🔄
+              </div>
             </div>
-
-            <!-- Estadísticas de Velocidad -->
-            <div class="stat-card">
-                <div class="stat-label">Velocidad Promedio</div>
-                <div class="stat-value" id="avg-velocity">-</div>
-                <div class="stat-unit">km/h</div>
-            </div>
-
+          </div>
         </div>
 
-        <div class="map-container">
-            <div id="map"></div>
+        <!-- Selector de Ruta -->
+        <div class="control-panel">
+          <h3>Seleccionar Ruta</h3>
+          <select id="line-selector" onchange="selectLine()">
+            <option value="">-- Todas las rutas --</option>
+          </select>
+
+          <!-- Selector de Orientación -->
+          <div
+            id="orientation-selector-container"
+            style="display: none; margin-top: 15px"
+          >
+            <label
+              style="
+                display: block;
+                margin-bottom: 8px;
+                color: #333;
+                font-weight: 500;
+              "
+              >Dirección:</label
+            >
+            <div class="mode-selector">
+              <button
+                class="mode-btn orientation-btn"
+                data-orientation="all"
+                onclick="selectOrientation('all')"
+              >
+                Ambas
+              </button>
+              <button
+                class="mode-btn orientation-btn active"
+                data-orientation="0"
+                onclick="selectOrientation('0')"
+              >
+                IDA 🔵
+              </button>
+              <button
+                class="mode-btn orientation-btn"
+                data-orientation="1"
+                onclick="selectOrientation('1')"
+              >
+                VUELTA 🔴
+              </button>
+            </div>
+          </div>
+
+          <div id="route-info" class="route-info" style="display: none">
+            <div class="route-info-item">
+              <span class="route-info-label">Ruta:</span>
+              <span class="route-info-value" id="route-name">-</span>
+            </div>
+            <div class="route-info-item">
+              <span class="route-info-label">Descripción:</span>
+              <span class="route-info-value" id="route-desc">-</span>
+            </div>
+            <div class="route-info-item">
+              <span class="route-info-label">Total Paradas:</span>
+              <span class="route-info-value" id="route-stops">-</span>
+            </div>
+          </div>
         </div>
+
+        <!-- Estadísticas de Velocidad -->
+        <div class="stat-card">
+          <div class="stat-label">Velocidad Promedio</div>
+          <div class="stat-value" id="avg-velocity">-</div>
+          <div class="stat-unit">km/h</div>
+        </div>
+      </div>
+
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <script>
-        // Configuración
-        const API_BASE = 'http://localhost:8080/api';
-        let map;
-        let currentMode = 'historical';
-        let streamingInterval;
-        let markersLayer;
-        let linesLayer;
-        let selectedLineId = null;
-        
-        // Datos cargados
-        let stops = [];
-        let lines = [];
-        let lineStops = [];
-        let velocities = {};
-        
-        // Cache de streaming
-        let streamingCache = [];
-        let updateCount = 0;
+      // Configuración
+      const API_BASE = "http://localhost:8080/api";
+      let map;
+      let currentMode = "historical";
+      let streamingInterval;
+      let markersLayer;
+      let linesLayer;
+      let selectedLineId = null;
+      let selectedOrientation = "0"; // Por defecto: IDA (0=IDA, 1=VUELTA, "all"=Ambas)
 
-        // Inicializar mapa
-        function initMap() {
-            // Centro de Cali, Colombia
-            map = L.map('map').setView([3.4516, -76.5320], 12);
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            
-            markersLayer = L.layerGroup().addTo(map);
-            linesLayer = L.layerGroup().addTo(map);
+      // Datos cargados
+      let stops = [];
+      let lines = [];
+      let lineStops = [];
+      let velocities = {};
+
+      // Cache de streaming
+      let streamingCache = [];
+      let updateCount = 0;
+
+      // Inicializar mapa
+      function initMap() {
+        // Centro de Cali, Colombia
+        map = L.map("map").setView([3.4516, -76.532], 12);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors",
+        }).addTo(map);
+
+        markersLayer = L.layerGroup().addTo(map);
+        linesLayer = L.layerGroup().addTo(map);
+      }
+
+      // Cargar datos estáticos
+      async function loadStaticData() {
+        console.log("Cargando datos estáticos del sistema...");
+        try {
+          const [stopsRes, linesRes, lineStopsRes] = await Promise.all([
+            fetch(`${API_BASE}/data/stops`),
+            fetch(`${API_BASE}/data/lines`),
+            fetch(`${API_BASE}/data/linestops`),
+          ]);
+
+          const stopsData = await stopsRes.json();
+          const linesData = await linesRes.json();
+          const lineStopsData = await lineStopsRes.json();
+
+          console.log("Respuestas recibidas:", {
+            stopsData,
+            linesData,
+            lineStopsData,
+          });
+
+          // Extraer data de la respuesta (manejar ambos formatos)
+          stops = Array.isArray(stopsData) ? stopsData : stopsData.data || [];
+          lines = Array.isArray(linesData) ? linesData : linesData.data || [];
+          lineStops = Array.isArray(lineStopsData)
+            ? lineStopsData
+            : lineStopsData.data || [];
+
+          console.log(
+            `Datos cargados: ${stops.length} paradas, ${lines.length} líneas, ${lineStops.length} relaciones`
+          );
+
+          if (lines.length > 0) {
+            populateLineSelector();
+          }
+          if (stops.length > 0) {
+            drawAllStops();
+          }
+        } catch (error) {
+          console.error("Error loading static data:", error);
         }
+      }
 
-        // Cargar datos estáticos
-        async function loadStaticData() {
-            console.log('Cargando datos estáticos del sistema...');
-            try {
-                const [stopsRes, linesRes, lineStopsRes] = await Promise.all([
-                    fetch(`${API_BASE}/data/stops`),
-                    fetch(`${API_BASE}/data/lines`),
-                    fetch(`${API_BASE}/data/linestops`)
-                ]);
-                
-                const stopsData = await stopsRes.json();
-                const linesData = await linesRes.json();
-                const lineStopsData = await lineStopsRes.json();
-                
-                console.log('Respuestas recibidas:', { stopsData, linesData, lineStopsData });
-                
-                // Extraer data de la respuesta (manejar ambos formatos)
-                stops = Array.isArray(stopsData) ? stopsData : (stopsData.data || []);
-                lines = Array.isArray(linesData) ? linesData : (linesData.data || []);
-                lineStops = Array.isArray(lineStopsData) ? lineStopsData : (lineStopsData.data || []);
-                
-                console.log(`Datos cargados: ${stops.length} paradas, ${lines.length} líneas, ${lineStops.length} relaciones`);
-                
-                if (lines.length > 0) {
-                    populateLineSelector();
-                }
-                if (stops.length > 0) {
-                    drawAllStops();
-                }
-            } catch (error) {
-                console.error('Error loading static data:', error);
+      // Poblar selector de líneas
+      function populateLineSelector() {
+        const selector = document.getElementById("line-selector");
+        lines.forEach((line) => {
+          const option = document.createElement("option");
+          option.value = line.LINEID;
+          option.textContent = `${line.SHORTNAME} - ${line.DESCRIPTION}`;
+          selector.appendChild(option);
+        });
+      }
+
+      // Dibujar todas las paradas con colores según orientación
+      function drawAllStops() {
+        markersLayer.clearLayers();
+        linesLayer.clearLayers();
+
+        // Crear un mapa de paradas con sus orientaciones
+        const stopOrientations = {};
+        lineStops.forEach((ls) => {
+          const stopId = ls.STOPID;
+          const orientation = ls.ORIENTATION !== undefined ? ls.ORIENTATION : 0;
+
+          if (!stopOrientations[stopId]) {
+            stopOrientations[stopId] = new Set();
+          }
+          stopOrientations[stopId].add(orientation);
+        });
+
+        stops.forEach((stop) => {
+          // Determinar el color según las orientaciones de esta parada
+          let fillColor = "#9ca3af"; // Gris por defecto
+
+          if (stopOrientations[stop.STOPID]) {
+            const orientations = Array.from(stopOrientations[stop.STOPID]);
+            if (orientations.length === 1) {
+              // Solo una orientación
+              fillColor =
+                orientations[0] === 0 || orientations[0] === "0"
+                  ? "#667eea"
+                  : "#e74c3c";
+            } else {
+              // Ambas orientaciones - usar púrpura
+              fillColor = "#9333ea";
             }
-        }
+          }
 
-        // Poblar selector de líneas
-        function populateLineSelector() {
-            const selector = document.getElementById('line-selector');
-            lines.forEach(line => {
-                const option = document.createElement('option');
-                option.value = line.LINEID;
-                option.textContent = `${line.SHORTNAME} - ${line.DESCRIPTION}`;
-                selector.appendChild(option);
-            });
-        }
-
-        // Dibujar todas las paradas
-        function drawAllStops() {
-            markersLayer.clearLayers();
-            
-            stops.forEach(stop => {
-                const marker = L.circleMarker(
-                    [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
-                    {
-                        radius: 4,
-                        fillColor: '#3b82f6',
-                        color: '#fff',
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }
-                ).bindPopup(`
+          const marker = L.circleMarker(
+            [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+            {
+              radius: 4,
+              fillColor: fillColor,
+              color: "#fff",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8,
+            }
+          ).bindPopup(`
                     <strong>${stop.LONGNAME}</strong><br>
                     ID: ${stop.STOPID}
                 `);
-                
-                markersLayer.addLayer(marker);
-            });
+
+          markersLayer.addLayer(marker);
+        });
+      }
+
+      // Seleccionar línea
+      async function selectLine() {
+        const lineId = document.getElementById("line-selector").value;
+        selectedLineId = lineId;
+
+        if (!lineId) {
+          linesLayer.clearLayers();
+          drawAllStops();
+          document.getElementById("route-info").style.display = "none";
+          document.getElementById(
+            "orientation-selector-container"
+          ).style.display = "none";
+          document.getElementById("avg-velocity").textContent = "-";
+          return;
         }
 
-        // Seleccionar línea
-        async function selectLine() {
-            const lineId = document.getElementById('line-selector').value;
-            selectedLineId = lineId;
-            
-            if (!lineId) {
-                linesLayer.clearLayers();
-                drawAllStops();
-                document.getElementById('route-info').style.display = 'none';
-                document.getElementById('avg-velocity').textContent = '-';
-                return;
+        // Mostrar selector de orientación
+        document.getElementById(
+          "orientation-selector-container"
+        ).style.display = "block";
+
+        const line = lines.find((l) => l.LINEID == lineId);
+        if (!line) return;
+
+        // Mostrar info de ruta
+        document.getElementById("route-info").style.display = "block";
+        document.getElementById("route-name").textContent = line.SHORTNAME;
+        document.getElementById("route-desc").textContent = line.DESCRIPTION;
+
+        // Obtener paradas de esta línea ORDENADAS correctamente
+        const stopsInLine = lineStops
+          .filter((ls) => ls.LINEID == lineId)
+          .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
+
+        document.getElementById("route-stops").textContent = stopsInLine.length;
+
+        // Cargar velocidades según el modo
+        if (currentMode === "historical") {
+          // En modo histórico, primero dibujar la ruta básica
+          drawLineRoute(stopsInLine);
+          await loadHistoricalVelocities(lineId);
+        } else if (currentMode === "streaming") {
+          // En modo streaming, NO dibujar ruta básica, solo arcos con velocidad
+          // Dibujar solo los marcadores de paradas
+          drawStopsOnly(stopsInLine);
+
+          // En modo streaming, usar el cache actual si existe
+          if (streamingCache.length > 0) {
+            const timestamp = new Date().toLocaleTimeString("es-CO");
+            const lineData = streamingCache.filter((v) => v.lineId == lineId);
+            console.log(
+              `[${timestamp}] 📍 Cambio de ruta a ${lineId}: ${lineData.length} registros en cache`
+            );
+
+            if (lineData.length > 0) {
+              const avgVel =
+                lineData.reduce((sum, v) => sum + v.velocityKmh, 0) /
+                lineData.length;
+              console.log(
+                `[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(
+                  1
+                )} km/h`
+              );
+              document.getElementById("avg-velocity").textContent =
+                avgVel.toFixed(1);
+
+              // Dibujar arcos con las velocidades en tiempo real
+              drawVelocityArcsFromStreaming(lineData);
+            } else {
+              console.log(
+                `[${timestamp}] ⚠️ Sin datos en cache para línea ${lineId}`
+              );
+              document.getElementById("avg-velocity").textContent = "-";
             }
-            
-            const line = lines.find(l => l.LINEID == lineId);
-            if (!line) return;
-            
-            // Mostrar info de ruta
-            document.getElementById('route-info').style.display = 'block';
-            document.getElementById('route-name').textContent = line.SHORTNAME;
-            document.getElementById('route-desc').textContent = line.DESCRIPTION;
-            
-            // Obtener paradas de esta línea ORDENADAS correctamente
-            const stopsInLine = lineStops
-                .filter(ls => ls.LINEID == lineId)
-                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
-            
-            document.getElementById('route-stops').textContent = stopsInLine.length;
-            
-            // Dibujar ruta
+          }
+        }
+      }
+
+      // Seleccionar orientación
+      function selectOrientation(orientation) {
+        selectedOrientation = orientation;
+
+        // Actualizar botones activos
+        document.querySelectorAll(".orientation-btn").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+        document
+          .querySelector(`[data-orientation="${orientation}"]`)
+          .classList.add("active");
+
+        // Redibujar con la orientación seleccionada
+        if (selectedLineId) {
+          const stopsInLine = lineStops
+            .filter((ls) => ls.LINEID == selectedLineId)
+            .sort(
+              (a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE)
+            );
+
+          if (currentMode === "historical") {
             drawLineRoute(stopsInLine);
-            
-            // Cargar velocidades según el modo
-            if (currentMode === 'historical') {
-                await loadHistoricalVelocities(lineId);
-            } else if (currentMode === 'streaming') {
-                // En modo streaming, usar el cache actual si existe
-                if (streamingCache.length > 0) {
-                    const timestamp = new Date().toLocaleTimeString('es-CO');
-                    const lineData = streamingCache.filter(v => v.lineId == lineId);
-                    console.log(`[${timestamp}] 📍 Cambio de ruta a ${lineId}: ${lineData.length} registros en cache`);
-                    
-                    if (lineData.length > 0) {
-                        const avgVel = lineData.reduce((sum, v) => sum + v.velocityKmh, 0) / lineData.length;
-                        console.log(`[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(1)} km/h`);
-                        document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
-                        
-                        // Dibujar arcos con las velocidades en tiempo real
-                        drawVelocityArcsFromStreaming(lineData);
-                    } else {
-                        console.log(`[${timestamp}] ⚠️ Sin datos en cache para línea ${lineId}`);
-                        document.getElementById('avg-velocity').textContent = '-';
-                    }
-                }
+          } else {
+            drawStopsOnly(stopsInLine);
+            if (streamingCache.length > 0) {
+              const lineData = streamingCache.filter(
+                (v) => v.lineId == selectedLineId
+              );
+              if (lineData.length > 0) {
+                drawVelocityArcsFromStreaming(lineData);
+              }
             }
+          }
+        }
+      }
+
+      // Dibujar ruta de línea
+      function drawLineRoute(stopsInLine) {
+        markersLayer.clearLayers();
+        linesLayer.clearLayers();
+
+        // CRÍTICO: Separar por ORIENTATION para evitar telaraña
+        const orientations = {};
+        console.log(
+          `[Route] DEPURACIÓN - Primera parada de stopsInLine:`,
+          stopsInLine[0]
+        );
+
+        stopsInLine.forEach((ls) => {
+          // Leer ORIENTATION del CSV (columna 2: 0=IDA, 1=VUELTA)
+          const orientation = ls.ORIENTATION !== undefined ? ls.ORIENTATION : 0;
+          if (!orientations[orientation]) {
+            orientations[orientation] = [];
+          }
+          orientations[orientation].push(ls);
+        });
+
+        console.log(
+          `[Route] DEPURACIÓN - Datos de ORIENTATION:`,
+          stopsInLine.slice(0, 5).map((ls) => ({
+            stopId: ls.STOPID,
+            seq: ls.STOPSEQUENCE,
+            orientation: ls.ORIENTATION,
+            orientationType: typeof ls.ORIENTATION,
+          }))
+        );
+
+        console.log(
+          `[Route] Orientaciones detectadas:`,
+          Object.keys(orientations).map(
+            (k) => `${k} (${orientations[k].length} paradas)`
+          )
+        );
+
+        // Filtrar por orientación seleccionada
+        let orientationsToRender = orientations;
+        if (selectedOrientation !== "all") {
+          console.log(
+            `[Route] Filtrando solo orientación ${selectedOrientation}`
+          );
+          orientationsToRender = {
+            [selectedOrientation]: orientations[selectedOrientation] || [],
+          };
         }
 
-        // Dibujar ruta de línea
-        function drawLineRoute(stopsInLine) {
-            markersLayer.clearLayers();
-            linesLayer.clearLayers();
-            
-            const coordinates = [];
-            
-            stopsInLine.forEach((ls, index) => {
-                const stop = stops.find(s => s.STOPID == ls.STOPID);
-                if (!stop) return;
-                
-                coordinates.push([stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE]);
-                
-                // Marcar paradas
-                const marker = L.circleMarker(
-                    [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
-                    {
-                        radius: 6,
-                        fillColor: '#3b82f6',
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.9
-                    }
-                ).bindPopup(`
-                    <strong>${stop.LONGNAME}</strong><br>
-                    Secuencia: ${ls.STOPSEQUENCE}<br>
-                    ID: ${stop.STOPID}
-                `);
-                
-                markersLayer.addLayer(marker);
+        // Dibujar cada orientación por separado (SOLO conectar paradas consecutivas dentro de la misma orientación)
+        Object.entries(orientationsToRender).forEach(
+          ([orientation, orientStops]) => {
+            if (!orientStops || orientStops.length === 0) return;
+
+            // CRÍTICO: Filtrar por la variante principal para evitar mezclar rutas
+            const variantGroups = {};
+            orientStops.forEach((ls) => {
+              const variant = ls.LINEVARIANT || "0";
+              if (!variantGroups[variant]) variantGroups[variant] = [];
+              variantGroups[variant].push(ls);
             });
-            
-            // Dibujar polilínea
-            if (coordinates.length > 1) {
-                const polyline = L.polyline(coordinates, {
-                    color: '#667eea',
-                    weight: 4,
-                    opacity: 0.7
-                });
-                linesLayer.addLayer(polyline);
-                map.fitBounds(polyline.getBounds());
-            }
-        }
 
-        // Cargar velocidades históricas
-        async function loadHistoricalVelocities(lineId) {
-            console.log(`[HISTÓRICO] Cargando velocidades para línea ${lineId}...`);
-            try {
-                const response = await fetch(`${API_BASE}/data/velocities/line/${lineId}`);
-                const result = await response.json();
-                
-                console.log(`[HISTÓRICO] Respuesta recibida:`, result);
-                
-                // Manejar ambos formatos de respuesta
-                const velocityData = Array.isArray(result) ? result : (result.data || []);
-                
-                if (velocityData.length > 0) {
-                    // Calcular velocidad promedio usando el campo correcto
-                    const avgVel = velocityData.reduce((sum, v) => {
-                        const vel = v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
-                        return sum + vel;
-                    }, 0) / velocityData.length;
-                    
-                    console.log(`[HISTÓRICO] Velocidad promedio: ${avgVel.toFixed(1)} km/h (${velocityData.length} registros)`);
-                    document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
-                    
-                    // Dibujar arcos con velocidades
-                    drawVelocityArcs(velocityData);
-                } else {
-                    console.warn(`[HISTÓRICO] No hay datos de velocidad para la línea ${lineId}`);
-                    document.getElementById('avg-velocity').textContent = '0.0';
+            // Tomar la variante con más paradas (la principal)
+            const mainVariant = Object.keys(variantGroups).reduce((a, b) =>
+              variantGroups[a].length > variantGroups[b].length ? a : b
+            );
+
+            console.log(
+              `[Route] Variantes encontradas para orientación ${orientation}:`,
+              Object.keys(variantGroups)
+                .map((v) => `${v}(${variantGroups[v].length})`)
+                .join(", "),
+              `- Usando variante ${mainVariant}`
+            );
+
+            // Usar solo la variante principal
+            orientStops = variantGroups[mainVariant];
+
+            // Ordenar por STOPSEQUENCE dentro de la variante
+            orientStops.sort(
+              (a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE)
+            );
+
+            const orientColor = orientation === "0" ? "#667eea" : "#e74c3c"; // IDA: azul, VUELTA: rojo
+
+            console.log(
+              `[Route] Dibujando ${orientStops.length} paradas para orientación ${orientation} variante ${mainVariant}`
+            );
+            console.log(
+              `[Route] Secuencias para orientación ${orientation}:`,
+              orientStops
+                .slice(0, 10)
+                .map(
+                  (ls) =>
+                    `${ls.STOPID}(ID:${ls.LINESTOPID},seq:${ls.STOPSEQUENCE})`
+                )
+                .join(" -> ")
+            );
+
+            // CRÍTICO: Dibujar marcadores Y segmentos consecutivos por separado
+            orientStops.forEach((ls, index) => {
+              const stop = stops.find((s) => s.STOPID == ls.STOPID);
+              if (!stop) {
+                console.warn(
+                  `[Route] ⚠️ Parada ${ls.STOPID} no encontrada en stops`
+                );
+                return;
+              }
+
+              // Marcar parada
+              const marker = L.circleMarker(
+                [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+                {
+                  radius: 6,
+                  fillColor: orientColor,
+                  color: "#fff",
+                  weight: 2,
+                  opacity: 1,
+                  fillOpacity: 0.9,
                 }
-            } catch (error) {
-                console.error('Error loading velocities:', error);
-                document.getElementById('avg-velocity').textContent = 'Error';
+              ).bindPopup(`
+                        <strong>${stop.LONGNAME}</strong><br>
+                        Secuencia: ${ls.STOPSEQUENCE}<br>
+                        Orientación: ${
+                          orientation === "0" ? "IDA" : "VUELTA"
+                        }<br>
+                        ID: ${stop.STOPID}
+                    `);
+
+              markersLayer.addLayer(marker);
+
+              // Dibujar línea SOLO a la siguiente parada consecutiva
+              if (index < orientStops.length - 1) {
+                const nextStop = stops.find(
+                  (s) => s.STOPID == orientStops[index + 1].STOPID
+                );
+                if (nextStop) {
+                  // Calcular distancia para detectar saltos anormales
+                  const distance = Math.sqrt(
+                    Math.pow(
+                      nextStop.DECIMALLATITUDE - stop.DECIMALLATITUDE,
+                      2
+                    ) +
+                      Math.pow(
+                        nextStop.DECIMALLONGITUDE - stop.DECIMALLONGITUDE,
+                        2
+                      )
+                  );
+
+                  if (distance > 0.05) {
+                    // Umbral de ~5km
+                    console.warn(
+                      `[Route] ⚠️ SALTO GRANDE detectado: ${stop.STOPID}(${
+                        ls.STOPSEQUENCE
+                      }) -> ${nextStop.STOPID}(${
+                        orientStops[index + 1].STOPSEQUENCE
+                      }), distancia: ${distance.toFixed(4)}`
+                    );
+                  }
+
+                  const segment = L.polyline(
+                    [
+                      [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+                      [nextStop.DECIMALLATITUDE, nextStop.DECIMALLONGITUDE],
+                    ],
+                    {
+                      color: orientColor,
+                      weight: 4,
+                      opacity: 0.7,
+                    }
+                  );
+                  linesLayer.addLayer(segment);
+                } else {
+                  console.warn(
+                    `[Route] ⚠️ Siguiente parada ${
+                      orientStops[index + 1].STOPID
+                    } no encontrada en stops`
+                  );
+                }
+              }
+            });
+
+            // Ajustar vista a la primera orientación renderizada
+            if (orientStops.length > 0) {
+              const firstStop = stops.find(
+                (s) => s.STOPID == orientStops[0].STOPID
+              );
+              const lastStop = stops.find(
+                (s) => s.STOPID == orientStops[orientStops.length - 1].STOPID
+              );
+              if (firstStop && lastStop) {
+                map.fitBounds([
+                  [firstStop.DECIMALLATITUDE, firstStop.DECIMALLONGITUDE],
+                  [lastStop.DECIMALLATITUDE, lastStop.DECIMALLONGITUDE],
+                ]);
+              }
             }
+          }
+        );
+      }
+
+      // Dibujar solo las paradas (para modo streaming) - SEPARADO POR ORIENTATION
+      function drawStopsOnly(stopsInLine) {
+        markersLayer.clearLayers();
+        linesLayer.clearLayers();
+
+        // Agrupar por orientación
+        const orientations = {};
+        stopsInLine.forEach((ls) => {
+          const orientation = ls.ORIENTATION !== undefined ? ls.ORIENTATION : 0;
+          if (!orientations[orientation]) {
+            orientations[orientation] = [];
+          }
+          orientations[orientation].push(ls);
+        });
+
+        console.log(
+          `[Stops] Orientaciones para paradas:`,
+          Object.keys(orientations).map(
+            (k) => `${k} (${orientations[k].length} paradas)`
+          )
+        );
+
+        // Filtrar por orientación seleccionada
+        let orientationsToRender = orientations;
+        if (selectedOrientation !== "all") {
+          console.log(
+            `[Stops] Filtrando solo orientación ${selectedOrientation}`
+          );
+          orientationsToRender = {
+            [selectedOrientation]: orientations[selectedOrientation] || [],
+          };
         }
 
-        // Dibujar arcos con colores según velocidad
-        function drawVelocityArcs(velocityData) {
-            linesLayer.clearLayers();
-            
-            if (!selectedLineId) return;
-            
-            // Obtener paradas de esta línea ORDENADAS por STOPSEQUENCE
-            const stopsInLine = lineStops
-                .filter(ls => ls.LINEID == selectedLineId)
-                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
-            
-            // Crear mapa de velocidades por promedio de línea
-            const avgVelocity = velocityData.length > 0 
-                ? velocityData.reduce((sum, v) => {
-                    const vel = v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
-                    return sum + vel;
-                }, 0) / velocityData.length 
-                : 0;
-            
-            // Dibujar arcos entre paradas consecutivas
-            for (let i = 0; i < stopsInLine.length - 1; i++) {
-                const stop1 = stops.find(s => s.STOPID == stopsInLine[i].STOPID);
-                const stop2 = stops.find(s => s.STOPID == stopsInLine[i + 1].STOPID);
-                
-                if (!stop1 || !stop2) continue;
-                
-                // Color según velocidad promedio de la línea
-                let color = '#10b981'; // Verde (alta)
-                if (avgVelocity < 20) color = '#ef4444'; // Rojo (baja)
-                else if (avgVelocity < 40) color = '#f59e0b'; // Amarillo (media)
-                
-                const line = L.polyline([
-                    [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
-                    [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE]
-                ], {
-                    color: color,
-                    weight: 5,
-                    opacity: 0.8
-                }).bindPopup(`
+        const allCoordinates = [];
+
+        // Dibujar cada orientación por separado
+        Object.entries(orientationsToRender).forEach(
+          ([orientation, orientStops]) => {
+            if (!orientStops || orientStops.length === 0) return;
+
+            // Filtrar por la variante principal
+            const variantGroups = {};
+            orientStops.forEach((ls) => {
+              const variant = ls.LINEVARIANT || "0";
+              if (!variantGroups[variant]) variantGroups[variant] = [];
+              variantGroups[variant].push(ls);
+            });
+
+            const mainVariant = Object.keys(variantGroups).reduce((a, b) =>
+              variantGroups[a].length > variantGroups[b].length ? a : b
+            );
+
+            orientStops = variantGroups[mainVariant];
+
+            orientStops.sort(
+              (a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE)
+            );
+
+            const orientColor = orientation === "0" ? "#667eea" : "#e74c3c"; // IDA: azul, VUELTA: rojo
+
+            orientStops.forEach((ls) => {
+              const stop = stops.find((s) => s.STOPID == ls.STOPID);
+              if (!stop) return;
+
+              allCoordinates.push([
+                stop.DECIMALLATITUDE,
+                stop.DECIMALLONGITUDE,
+              ]);
+
+              const marker = L.circleMarker(
+                [stop.DECIMALLATITUDE, stop.DECIMALLONGITUDE],
+                {
+                  radius: 6,
+                  fillColor: orientColor,
+                  color: "#fff",
+                  weight: 2,
+                  opacity: 1,
+                  fillOpacity: 0.9,
+                }
+              ).bindPopup(`
+                        <strong>${stop.LONGNAME}</strong><br>
+                        Secuencia: ${ls.STOPSEQUENCE}<br>
+                        Orientación: ${
+                          orientation === "0" ? "IDA" : "VUELTA"
+                        }<br>
+                        ID: ${stop.STOPID}
+                    `);
+
+              markersLayer.addLayer(marker);
+            });
+          }
+        );
+
+        // Ajustar vista del mapa
+        if (allCoordinates.length > 1) {
+          const bounds = L.latLngBounds(allCoordinates);
+          map.fitBounds(bounds);
+        }
+      }
+
+      // Cargar velocidades históricas
+      async function loadHistoricalVelocities(lineId) {
+        console.log(`[HISTÓRICO] Cargando velocidades para línea ${lineId}...`);
+        try {
+          const response = await fetch(
+            `${API_BASE}/data/velocities/line/${lineId}`
+          );
+          const result = await response.json();
+
+          console.log(`[HISTÓRICO] Respuesta recibida:`, result);
+
+          // Manejar ambos formatos de respuesta
+          const velocityData = Array.isArray(result)
+            ? result
+            : result.data || [];
+
+          if (velocityData.length > 0) {
+            // Calcular velocidad promedio usando el campo correcto
+            const avgVel =
+              velocityData.reduce((sum, v) => {
+                const vel =
+                  v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
+                return sum + vel;
+              }, 0) / velocityData.length;
+
+            console.log(
+              `[HISTÓRICO] Velocidad promedio: ${avgVel.toFixed(1)} km/h (${
+                velocityData.length
+              } registros)`
+            );
+            document.getElementById("avg-velocity").textContent =
+              avgVel.toFixed(1);
+
+            // Dibujar arcos con velocidades
+            drawVelocityArcs(velocityData);
+          } else {
+            console.warn(
+              `[HISTÓRICO] No hay datos de velocidad para la línea ${lineId}`
+            );
+            document.getElementById("avg-velocity").textContent = "0.0";
+          }
+        } catch (error) {
+          console.error("Error loading velocities:", error);
+          document.getElementById("avg-velocity").textContent = "Error";
+        }
+      }
+
+      // Dibujar arcos con colores según velocidad
+      function drawVelocityArcs(velocityData) {
+        linesLayer.clearLayers();
+
+        if (!selectedLineId) return;
+
+        // Obtener paradas de esta línea ORDENADAS por STOPSEQUENCE
+        const stopsInLine = lineStops
+          .filter((ls) => ls.LINEID == selectedLineId)
+          .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
+
+        // Crear mapa de velocidades por promedio de línea
+        const avgVelocity =
+          velocityData.length > 0
+            ? velocityData.reduce((sum, v) => {
+                const vel =
+                  v.velocity_km_h || v.velocityKmh || v.VELOCITY_KM_H || 0;
+                return sum + vel;
+              }, 0) / velocityData.length
+            : 0;
+
+        // Dibujar arcos entre paradas consecutivas
+        for (let i = 0; i < stopsInLine.length - 1; i++) {
+          const stop1 = stops.find((s) => s.STOPID == stopsInLine[i].STOPID);
+          const stop2 = stops.find(
+            (s) => s.STOPID == stopsInLine[i + 1].STOPID
+          );
+
+          if (!stop1 || !stop2) continue;
+
+          // Color según velocidad promedio de la línea
+          let color = "#10b981"; // Verde (alta)
+          if (avgVelocity < 20) color = "#ef4444"; // Rojo (baja)
+          else if (avgVelocity < 40) color = "#f59e0b"; // Amarillo (media)
+
+          const line = L.polyline(
+            [
+              [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
+              [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE],
+            ],
+            {
+              color: color,
+              weight: 5,
+              opacity: 0.8,
+            }
+          ).bindPopup(`
                     <strong>Arco ${i + 1}</strong><br>
                     De: ${stop1.LONGNAME}<br>
                     A: ${stop2.LONGNAME}<br>
                     Velocidad promedio línea: ${avgVelocity.toFixed(1)} km/h
                 `);
-                
-                linesLayer.addLayer(line);
-            }
-        }
 
-        // Cambiar modo
-        function setMode(mode) {
-            currentMode = mode;
-            
-            // Actualizar botones
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            console.log(`Modo cambiado a: ${mode}`);
-            
-            // Manejar streaming
-            if (mode === 'streaming') {
-                document.getElementById('streaming-status').style.display = 'block';
-                console.log('STREAMING ACTIVADO - Actualizando cada 30 segundos');
-                startStreaming();
+          linesLayer.addLayer(line);
+        }
+      }
+
+      // Cambiar modo
+      function setMode(mode) {
+        currentMode = mode;
+
+        // Actualizar botones
+        document.querySelectorAll(".mode-btn").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+        event.target.classList.add("active");
+
+        console.log(`Modo cambiado a: ${mode}`);
+
+        // Manejar streaming
+        if (mode === "streaming") {
+          document.getElementById("streaming-status").style.display = "block";
+          console.log("STREAMING ACTIVADO - Actualizando cada 30 segundos");
+          startStreaming();
+        } else {
+          document.getElementById("streaming-status").style.display = "none";
+          console.log("Modo histórico activado - Consultando base de datos");
+          stopStreaming();
+          if (selectedLineId) {
+            selectLine();
+          }
+        }
+      }
+
+      // Iniciar streaming
+      function startStreaming() {
+        stopStreaming();
+        console.log("Iniciando streaming - Primera carga...");
+        loadStreamingData();
+        streamingInterval = setInterval(() => {
+          console.log(
+            "[STREAMING] Actualizando datos automáticamente (cada 30s)..."
+          );
+          loadStreamingData();
+        }, 30000); // Cada 30 segundos
+        console.log("Intervalo de streaming configurado: cada 30 segundos");
+      }
+
+      // Detener streaming
+      function stopStreaming() {
+        if (streamingInterval) {
+          clearInterval(streamingInterval);
+          streamingInterval = null;
+          console.log("Streaming detenido");
+          // Resetear contador al detener
+          updateCount = 0;
+        }
+      }
+
+      // Cargar datos de streaming
+      async function loadStreamingData() {
+        const timestamp = new Date().toLocaleTimeString("es-CO");
+        console.log(`[${timestamp}] 🔄 Solicitando datos de streaming...`);
+
+        try {
+          const response = await fetch(`${API_BASE}/data/streaming`);
+          console.log(`[${timestamp}] Respuesta recibida:`, response.status);
+
+          const result = await response.json();
+          console.log(`[${timestamp}] Datos parseados:`, result);
+
+          // Actualizar indicadores visuales
+          document.getElementById(
+            "last-update"
+          ).textContent = `Última actualización: ${timestamp}`;
+
+          if (result.success && result.data) {
+            // Manejar ambos formatos de respuesta:
+            // ApiServer simple: {success: true, data: [...]}
+            // Spring Boot: {success: true, data: {data: [...], cacheSize: 0, lastUpdate: ...}}
+            let velocities, cacheSize, lastUpdate;
+
+            if (Array.isArray(result.data)) {
+              // Formato ApiServer simple
+              velocities = result.data;
+              cacheSize = velocities.length;
+              lastUpdate = result.timestamp;
             } else {
-                document.getElementById('streaming-status').style.display = 'none';
-                console.log('Modo histórico activado - Consultando base de datos');
-                stopStreaming();
-                if (selectedLineId) {
-                    selectLine();
-                }
+              // Formato Spring Boot con StreamingService
+              const responseData = result.data;
+              velocities = responseData.data || [];
+              cacheSize = responseData.cacheSize || 0;
+              lastUpdate = responseData.lastUpdate;
             }
+
+            console.log(
+              `[${timestamp}] ✅ Datos recibidos: ${velocities.length} velocidades`
+            );
+            console.log(`[${timestamp}] 📊 Cache: ${cacheSize} registros`);
+            console.log(
+              `[${timestamp}] 🕐 Última actualización servidor: ${lastUpdate}`
+            );
+
+            // Guardar en cache global para uso al cambiar de ruta
+            streamingCache = velocities;
+
+            // Incrementar contador y mostrar indicador visual
+            updateCount++;
+            document.getElementById(
+              "update-counter"
+            ).textContent = `Actualizaciones: ${updateCount}`;
+
+            // Efecto flash en el panel
+            const streamingStatus = document.getElementById("streaming-status");
+            streamingStatus.classList.add("updating");
+            setTimeout(() => streamingStatus.classList.remove("updating"), 600);
+
+            // Mostrar icono de actualización brevemente
+            const updateIndicator = document.getElementById("update-indicator");
+            updateIndicator.style.display = "block";
+            setTimeout(() => (updateIndicator.style.display = "none"), 1000);
+
+            document.getElementById(
+              "data-count"
+            ).textContent = `Registros en caché: ${cacheSize} | Mostrando: ${velocities.length}`;
+            document.getElementById("data-count").style.color = "#4caf50";
+            document.getElementById("data-count").style.fontWeight = "bold";
+
+            if (selectedLineId && velocities.length > 0) {
+              const lineData = velocities.filter(
+                (v) => v.lineId == selectedLineId
+              );
+              console.log(
+                `[${timestamp}] Filtrado para línea ${selectedLineId}: ${lineData.length} registros`
+              );
+
+              if (lineData.length > 0) {
+                const avgVel =
+                  lineData.reduce((sum, v) => sum + v.velocityKmh, 0) /
+                  lineData.length;
+                console.log(
+                  `[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(
+                    1
+                  )} km/h`
+                );
+                document.getElementById("avg-velocity").textContent =
+                  avgVel.toFixed(1);
+
+                // Dibujar arcos con las velocidades en tiempo real
+                drawVelocityArcsFromStreaming(lineData);
+              } else {
+                console.warn(
+                  `[${timestamp}] ⚠️ No hay datos streaming para línea ${selectedLineId}`
+                );
+              }
+            } else if (velocities.length === 0) {
+              console.warn(`[${timestamp}] ⚠️ Sin datos de velocidad en caché`);
+            }
+          } else {
+            console.warn(`[${timestamp}] ⚠️ Respuesta sin datos`);
+            document.getElementById("data-count").textContent =
+              "Esperando datos...";
+            document.getElementById("data-count").style.color = "#ff9800";
+          }
+        } catch (error) {
+          console.error(`[${timestamp}] ❌ Error:`, error);
+          document.getElementById("data-count").textContent =
+            "Error en conexión";
+          document.getElementById("data-count").style.color = "#f44336";
+        }
+      }
+
+      // Dibujar arcos con datos de streaming - CRÍTICO: SEPARAR POR ORIENTATION
+      function drawVelocityArcsFromStreaming(velocityData) {
+        linesLayer.clearLayers();
+
+        if (!selectedLineId) return;
+
+        // Agrupar paradas por ORIENTATION
+        const orientations = {};
+        lineStops
+          .filter((ls) => ls.LINEID == selectedLineId)
+          .forEach((ls) => {
+            const orientation =
+              ls.ORIENTATION !== undefined ? ls.ORIENTATION : 0;
+            if (!orientations[orientation]) {
+              orientations[orientation] = [];
+            }
+            orientations[orientation].push(ls);
+          });
+
+        // Crear mapa de velocidades por arco
+        const velocityByArc = {};
+        velocityData.forEach((v) => {
+          velocityByArc[v.arcId] = v.velocityKmh;
+        });
+
+        console.log(
+          `[Streaming] Datos de velocidad: ${velocityData.length} registros`
+        );
+        console.log(
+          `[Streaming] Primeros 5 arcIds con datos:`,
+          Object.keys(velocityByArc).slice(0, 5)
+        );
+        console.log(
+          `[Streaming] Orientaciones detectadas:`,
+          Object.keys(orientations).map(
+            (k) => `${k} (${orientations[k].length} paradas)`
+          )
+        );
+
+        // Filtrar por orientación seleccionada
+        let orientationsToRender = orientations;
+        if (selectedOrientation !== "all") {
+          console.log(
+            `[Streaming] Filtrando solo orientación ${selectedOrientation}`
+          );
+          orientationsToRender = {
+            [selectedOrientation]: orientations[selectedOrientation] || [],
+          };
         }
 
-        // Iniciar streaming
-        function startStreaming() {
-            stopStreaming();
-            console.log('Iniciando streaming - Primera carga...');
-            loadStreamingData();
-            streamingInterval = setInterval(() => {
-                console.log('[STREAMING] Actualizando datos automáticamente (cada 30s)...');
-                loadStreamingData();
-            }, 30000); // Cada 30 segundos
-            console.log('Intervalo de streaming configurado: cada 30 segundos');
-        }
+        let totalArcsWithData = 0;
+        let totalArcsWithoutData = 0;
 
-        // Detener streaming
-        function stopStreaming() {
-            if (streamingInterval) {
-                clearInterval(streamingInterval);
-                streamingInterval = null;
-                console.log('Streaming detenido');
-                // Resetear contador al detener
-                updateCount = 0;
-            }
-        }
+        // Dibujar arcos POR CADA ORIENTACIÓN por separado (CRÍTICO: SOLO consecutivos)
+        Object.entries(orientationsToRender).forEach(
+          ([orientation, orientStops]) => {
+            if (!orientStops || orientStops.length === 0) return;
 
-        // Cargar datos de streaming
-        async function loadStreamingData() {
-            const timestamp = new Date().toLocaleTimeString('es-CO');
-            console.log(`[${timestamp}] 🔄 Solicitando datos de streaming...`);
-            
-            try {
-                const response = await fetch(`${API_BASE}/data/streaming`);
-                console.log(`[${timestamp}] Respuesta recibida:`, response.status);
-                
-                const result = await response.json();
-                console.log(`[${timestamp}] Datos parseados:`, result);
-                
-                // Actualizar indicadores visuales
-                document.getElementById('last-update').textContent = `Última actualización: ${timestamp}`;
-                
-                if (result.success && result.data) {
-                    // Manejar ambos formatos de respuesta:
-                    // ApiServer simple: {success: true, data: [...]}
-                    // Spring Boot: {success: true, data: {data: [...], cacheSize: 0, lastUpdate: ...}}
-                    let velocities, cacheSize, lastUpdate;
-                    
-                    if (Array.isArray(result.data)) {
-                        // Formato ApiServer simple
-                        velocities = result.data;
-                        cacheSize = velocities.length;
-                        lastUpdate = result.timestamp;
-                    } else {
-                        // Formato Spring Boot con StreamingService
-                        const responseData = result.data;
-                        velocities = responseData.data || [];
-                        cacheSize = responseData.cacheSize || 0;
-                        lastUpdate = responseData.lastUpdate;
-                    }
-                    
-                    console.log(`[${timestamp}] ✅ Datos recibidos: ${velocities.length} velocidades`);
-                    console.log(`[${timestamp}] 📊 Cache: ${cacheSize} registros`);
-                    console.log(`[${timestamp}] 🕐 Última actualización servidor: ${lastUpdate}`);
-                    
-                    // Guardar en cache global para uso al cambiar de ruta
-                    streamingCache = velocities;
-                    
-                    // Incrementar contador y mostrar indicador visual
-                    updateCount++;
-                    document.getElementById('update-counter').textContent = `Actualizaciones: ${updateCount}`;
-                    
-                    // Efecto flash en el panel
-                    const streamingStatus = document.getElementById('streaming-status');
-                    streamingStatus.classList.add('updating');
-                    setTimeout(() => streamingStatus.classList.remove('updating'), 600);
-                    
-                    // Mostrar icono de actualización brevemente
-                    const updateIndicator = document.getElementById('update-indicator');
-                    updateIndicator.style.display = 'block';
-                    setTimeout(() => updateIndicator.style.display = 'none', 1000);
-                    
-                    document.getElementById('data-count').textContent = `Registros en caché: ${cacheSize} | Mostrando: ${velocities.length}`;
-                    document.getElementById('data-count').style.color = '#4caf50';
-                    document.getElementById('data-count').style.fontWeight = 'bold';
-                    
-                    if (selectedLineId && velocities.length > 0) {
-                        const lineData = velocities.filter(v => v.lineId == selectedLineId);
-                        console.log(`[${timestamp}] Filtrado para línea ${selectedLineId}: ${lineData.length} registros`);
-                        
-                        if (lineData.length > 0) {
-                            const avgVel = lineData.reduce((sum, v) => sum + v.velocityKmh, 0) / lineData.length;
-                            console.log(`[${timestamp}] 🚀 Velocidad promedio: ${avgVel.toFixed(1)} km/h`);
-                            document.getElementById('avg-velocity').textContent = avgVel.toFixed(1);
-                            
-                            // Dibujar arcos con las velocidades en tiempo real
-                            drawVelocityArcsFromStreaming(lineData);
-                        } else {
-                            console.warn(`[${timestamp}] ⚠️ No hay datos streaming para línea ${selectedLineId}`);
-                        }
-                    } else if (velocities.length === 0) {
-                        console.warn(`[${timestamp}] ⚠️ Sin datos de velocidad en caché`);
-                    }
-                } else {
-                    console.warn(`[${timestamp}] ⚠️ Respuesta sin datos`);
-                    document.getElementById('data-count').textContent = 'Esperando datos...';
-                    document.getElementById('data-count').style.color = '#ff9800';
-                }
-            } catch (error) {
-                console.error(`[${timestamp}] ❌ Error:`, error);
-                document.getElementById('data-count').textContent = 'Error en conexión';
-                document.getElementById('data-count').style.color = '#f44336';
-            }
-        }
-        
-        // Dibujar arcos con datos de streaming
-        function drawVelocityArcsFromStreaming(velocityData) {
-            linesLayer.clearLayers();
-            
-            if (!selectedLineId) return;
-            
-            // Obtener paradas de esta línea ORDENADAS
-            const stopsInLine = lineStops
-                .filter(ls => ls.LINEID == selectedLineId)
-                .sort((a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE));
-            
-            // Crear mapa de velocidades por arco
-            const velocityByArc = {};
-            velocityData.forEach(v => {
-                velocityByArc[v.arcId] = v.velocityKmh;
+            // Filtrar por la variante principal
+            const variantGroups = {};
+            orientStops.forEach((ls) => {
+              const variant = ls.LINEVARIANT || "0";
+              if (!variantGroups[variant]) variantGroups[variant] = [];
+              variantGroups[variant].push(ls);
             });
-            
-            // Dibujar arcos entre paradas consecutivas
-            for (let i = 0; i < stopsInLine.length - 1; i++) {
-                const stop1 = stops.find(s => s.STOPID == stopsInLine[i].STOPID);
-                const stop2 = stops.find(s => s.STOPID == stopsInLine[i + 1].STOPID);
-                
-                if (!stop1 || !stop2) continue;
-                
-                const arcId = `${stopsInLine[i].STOPID}_${stopsInLine[i + 1].STOPID}`;
-                const velocity = velocityByArc[arcId] || 0;
-                
-                // Color según velocidad
-                let color = '#10b981'; // Verde (alta)
-                if (velocity < 20) color = '#ef4444'; // Rojo (baja)
-                else if (velocity < 40) color = '#f59e0b'; // Amarillo (media)
-                
-                const line = L.polyline([
-                    [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
-                    [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE]
-                ], {
-                    color: color,
-                    weight: 6,
-                    opacity: 0.9
-                }).bindPopup(`
-                    <strong>🔴 STREAMING - Arco ${i + 1}</strong><br>
-                    De: ${stop1.LONGNAME}<br>
-                    A: ${stop2.LONGNAME}<br>
-                    <strong>Velocidad actual: ${velocity.toFixed(1)} km/h</strong>
-                `);
-                
-                linesLayer.addLayer(line);
-            }
-        }
 
-        // Inicializar
-        window.onload = function() {
-            initMap();
-            loadStaticData();
-        };
+            const mainVariant = Object.keys(variantGroups).reduce((a, b) =>
+              variantGroups[a].length > variantGroups[b].length ? a : b
+            );
+
+            orientStops = variantGroups[mainVariant];
+
+            // Ordenar por STOPSEQUENCE dentro de cada orientación
+            orientStops.sort(
+              (a, b) => parseInt(a.STOPSEQUENCE) - parseInt(b.STOPSEQUENCE)
+            );
+
+            console.log(
+              `[Streaming] Dibujando ${
+                orientStops.length - 1
+              } arcos para orientación ${orientation} variante ${mainVariant} (${
+                orientation === "0" ? "IDA" : "VUELTA"
+              })`
+            );
+
+            console.log(
+              `[Streaming] Primeros 5 arcos esperados:`,
+              orientStops
+                .slice(0, 5)
+                .map((ls, i) =>
+                  i < orientStops.length - 1
+                    ? `ARC_${selectedLineId}_${ls.STOPID}_${
+                        orientStops[i + 1].STOPID
+                      }`
+                    : "último"
+                )
+            );
+
+            // Dibujar SOLO arcos consecutivos DENTRO de esta orientación
+            for (let i = 0; i < orientStops.length - 1; i++) {
+              const stop1 = stops.find(
+                (s) => s.STOPID == orientStops[i].STOPID
+              );
+              const stop2 = stops.find(
+                (s) => s.STOPID == orientStops[i + 1].STOPID
+              );
+
+              if (!stop1 || !stop2) continue;
+
+              // Construir arcId: ARC_{lineId}_{stopId1}_{stopId2}
+              const arcId = `ARC_${selectedLineId}_${orientStops[i].STOPID}_${
+                orientStops[i + 1].STOPID
+              }`;
+              const velocity = velocityByArc[arcId] || 0;
+
+              if (velocity > 0) totalArcsWithData++;
+              else totalArcsWithoutData++;
+
+              // Color según velocidad
+              let color = "#9ca3af"; // Gris (sin datos)
+              if (velocity > 0) {
+                if (velocity < 20) color = "#ef4444"; // Rojo (baja)
+                else if (velocity < 40) color = "#f59e0b"; // Amarillo (media)
+                else color = "#10b981"; // Verde (alta)
+              }
+
+              const line = L.polyline(
+                [
+                  [stop1.DECIMALLATITUDE, stop1.DECIMALLONGITUDE],
+                  [stop2.DECIMALLATITUDE, stop2.DECIMALLONGITUDE],
+                ],
+                {
+                  color: color,
+                  weight: 6,
+                  opacity: 0.9,
+                }
+              ).bindPopup(`
+                        <strong>🔴 STREAMING - Orientación ${
+                          orientation === "0" ? "IDA" : "VUELTA"
+                        }</strong><br>
+                        De: ${stop1.LONGNAME}<br>
+                        A: ${stop2.LONGNAME}<br>
+                        <strong>Velocidad actual: ${
+                          velocity > 0 ? velocity.toFixed(1) : "Sin datos"
+                        } km/h</strong>
+                    `);
+
+              linesLayer.addLayer(line);
+            }
+          }
+        );
+
+        console.log(
+          `[Streaming] ✅ Arcos dibujados - Con datos: ${totalArcsWithData}, Sin datos: ${totalArcsWithoutData}`
+        );
+      }
+
+      // Inicializar
+      window.onload = function () {
+        initMap();
+        loadStaticData();
+      };
     </script>
-</body>
+  </body>
 </html>

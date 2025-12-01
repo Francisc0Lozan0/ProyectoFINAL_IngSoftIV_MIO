@@ -157,9 +157,12 @@ public class StaticDataController {
                     if (parts.length < 5) continue;
                     
                     Map<String, Object> lsMap = new HashMap<>();
+                    lsMap.put("LINESTOPID", parts[0].trim()); // ID único para ordenamiento correcto
                     lsMap.put("LINEID", parts[3].trim());
                     lsMap.put("STOPID", parts[4].trim());
                     lsMap.put("STOPSEQUENCE", Integer.parseInt(parts[1].trim()));
+                    lsMap.put("ORIENTATION", Integer.parseInt(parts[2].trim())); // Columna 2: ORIENTATION (0=IDA, 1=VUELTA)
+                    lsMap.put("LINEVARIANT", parts.length > 6 ? parts[6].trim() : "0"); // Variante de línea
                     lineStopsList.add(lsMap);
                 }
             }
